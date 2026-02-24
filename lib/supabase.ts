@@ -25,6 +25,28 @@ export type NewJob = {
   description?: string | null;
 };
 
+export type Project = {
+  id: string;
+  username: string;
+  name: string;
+  description: string;
+  tech_stack: string | null;
+  live_url: string | null;
+  github_url: string | null;
+  image_url: string | null;
+  created_at: string;
+};
+
+export type NewProject = {
+  username: string;
+  name: string;
+  description: string;
+  tech_stack?: string | null;
+  live_url?: string | null;
+  github_url?: string | null;
+  image_url?: string | null;
+};
+
 export async function getLatestCV() {
   // 1. Get the list of files in the 'cvs' folder, sorted by newest
   const { data, error } = await supabase.storage
@@ -78,6 +100,45 @@ export async function deleteJob(jobId: string) {
     .from('jobs')
     .delete()
     .eq('id', jobId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function getProjects(username: string) {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('*')
+    .eq('username', username)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as Project[];
+}
+
+export async function createProject(project: NewProject) {
+  const { data, error } = await supabase
+    .from('projects')
+    .insert(project)
+    .select('*')
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data as Project;
+}
+
+export async function deleteProject(projectId: string) {
+  const { error } = await supabase
+    .from('projects')
+    .delete()
+    .eq('id', projectId);
 
   if (error) {
     throw error;

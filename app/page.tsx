@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { getGithubRepos, type GithubRepo } from '../lib/github';
-import { LayoutDashboard, Github, FileText, Star, ExternalLink, BriefcaseBusiness } from 'lucide-react';
+import { LayoutDashboard, Github, FileText, Star, ExternalLink, BriefcaseBusiness, Code2 } from 'lucide-react';
 import Vault from '../components/Vault';
 import Jobs from '../components/Jobs';
+import Projects from '../components/Projects';
 
 export default function Home() {
   const profileUsername = 'Alatsakimaria';
@@ -56,6 +57,13 @@ export default function Home() {
           >
             <BriefcaseBusiness size={18} /> Jobs
           </div>
+
+          <div
+            onClick={() => setActiveTab('projects')}
+            className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${activeTab === 'projects' ? 'bg-white/10 text-white' : 'hover:bg-white/5'}`}
+          >
+            <Code2 size={18} /> Projects
+          </div>
         </nav>
       </aside>
 
@@ -63,7 +71,7 @@ export default function Home() {
       <section className="flex-1 flex flex-col bg-white overflow-hidden">
         <header className="h-20 border-b border-gray-100 flex items-center justify-between px-10">
           <p className="text-lg font-bold text-gray-800">
-            {activeTab === 'jobs' ? 'Work Experience' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+            {activeTab === 'jobs' ? 'Work Experience' : activeTab === 'projects' ? 'Projects' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
           </p>
         </header>
 
@@ -131,6 +139,7 @@ export default function Home() {
 
             {activeTab === 'vault' && <Vault />}
             {activeTab === 'jobs' && <Jobs username={profileUsername} />}
+            {activeTab === 'projects' && <Projects username={profileUsername} />}
 
           </div>
         </div>
