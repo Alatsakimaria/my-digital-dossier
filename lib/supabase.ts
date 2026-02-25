@@ -47,6 +47,15 @@ export type NewProject = {
   image_url?: string | null;
 };
 
+export type UpdateProject = {
+  name?: string;
+  description?: string;
+  tech_stack?: string | null;
+  live_url?: string | null;
+  github_url?: string | null;
+  image_url?: string | null;
+};
+
 export async function getLatestCV() {
   // 1. Get the list of files in the 'cvs' folder, sorted by newest
   const { data, error } = await supabase.storage
@@ -139,6 +148,76 @@ export async function deleteProject(projectId: string) {
     .from('projects')
     .delete()
     .eq('id', projectId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function updateProject(projectId: string, updates: UpdateProject) {
+  const { data, error } = await supabase
+    .from('projects')
+    .update(updates)
+    .eq('id', projectId)
+    .select('*')
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data as Project;
+}
+
+
+
+export type ProjectImage = {
+  id: string;
+  project_id: string;
+  image_url: string;
+  created_at: string;
+};
+
+export async function getProjectById(projectId: string) {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('*')
+    .eq('id', projectId)
+    .maybeSingle(); // returns null instead of throwing if not found
+
+  if (error) {
+    throw error;
+  }
+
+  // data can be null if no row with that id
+  return data as Project | null;
+}
+
+export async function getProjectImages(projectId: string) {
+  const { data, error } = await supabase
+    .from('project_images')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as ProjectImage[];
+}
+
+export async function addProjectImages(projectId: string, imageUrls: string[]) {
+  if (!imageUrls.length) return;
+
+  const rows = imageUrls.map((url) => ({
+    project_id: projectId,
+    image_url: url,
+  }));
+
+  const { error } = await supabase
+    .from('project_images')
+    .insert(rows);
 
   if (error) {
     throw error;
