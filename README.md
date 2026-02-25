@@ -1,103 +1,84 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# My Digital Dossier
 
-## Getting Started
+A portfolio web app built with Next.js + Supabase.
 
-First, run the development server:
+It includes:
+- Portfolio Home (editable profile hero)
+- Projects tab (manual projects, gallery uploads, pin/unpin best projects)
+- Jobs tab (work experience CRUD)
+- Vault tab (file storage in Supabase bucket)
+
+## Tech Stack
+
+- Next.js 16 (App Router)
+- React 19
+- TypeScript
+- Tailwind CSS v4
+- Supabase (Postgres + Storage)
+
+## Local Development
+
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Create `.env.local` with:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+3. Start dev server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+4. Open http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Database Setup (Supabase)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Run the SQL migrations in Supabase SQL Editor.
 
-## Learn More
+Required files:
+- [sql/2026-02-25-project-images.sql](sql/2026-02-25-project-images.sql)
+- [sql/2026-02-25-profile-settings.sql](sql/2026-02-25-profile-settings.sql)
+- [sql/2026-02-25-project-pinning.sql](sql/2026-02-25-project-pinning.sql)
 
-To learn more about Next.js, take a look at the following resources:
+These add:
+- `project_images` table for project gallery photos
+- `profile_settings` table for editable home profile content
+- `projects.is_pinned` column for best-project pinning
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Also ensure your existing `jobs` and `projects` tables + policies are already created in Supabase.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Storage Setup
 
-## Deploy on Vercel
+Create a Supabase Storage bucket named `dossier-files`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Make sure storage policies allow:
+- read
+- insert
+- delete
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+for `anon` and `authenticated` roles (current MVP setup).
 
-## Supabase setup for Jobs tab
+## Important Current Behavior
 
-Run this SQL in your Supabase SQL editor so the Jobs tab can store and fetch records:
+- Authentication is intentionally not implemented yet.
+- The app currently uses a fixed username in [app/page.tsx](app/page.tsx) for MVP (`Alatsakimaria`).
+- Data is stored per `username`.
 
-```sql
-create extension if not exists pgcrypto;
+## Scripts
 
-create table if not exists public.jobs (
-	id uuid primary key default gen_random_uuid(),
-	username text not null,
-	title text not null,
-	company text not null,
-	start_date date not null,
-	end_date date,
-	description text,
-	created_at timestamptz not null default now()
-);
+- `npm run dev` - start development server
+- `npm run build` - production build
+- `npm run start` - run production server
+- `npm run lint` - run ESLint
 
-create index if not exists jobs_username_idx on public.jobs(username);
-create index if not exists jobs_start_date_idx on public.jobs(start_date desc);
+## Next Planned Step
 
-alter table public.jobs enable row level security;
-
-drop policy if exists "Allow public read jobs" on public.jobs;
-create policy "Allow public read jobs"
-on public.jobs
-for select
-to anon, authenticated
-using (true);
-
-drop policy if exists "Allow public insert jobs" on public.jobs;
-create policy "Allow public insert jobs"
-on public.jobs
-for insert
-to anon, authenticated
-with check (true);
-
-drop policy if exists "Allow public delete jobs" on public.jobs;
-create policy "Allow public delete jobs"
-on public.jobs
-for delete
-to anon, authenticated
-using (true);
-
--- Storage policies (required for delete button in Vault)
-drop policy if exists "Public read dossier files" on storage.objects;
-create policy "Public read dossier files"
-on storage.objects
-for select
-to anon, authenticated
-using (bucket_id = 'dossier-files');
-
-drop policy if exists "Public insert dossier files" on storage.objects;
-create policy "Public insert dossier files"
-on storage.objects
-for insert
-to anon, authenticated
-with check (bucket_id = 'dossier-files');
-
-drop policy if exists "Public delete dossier files" on storage.objects;
-create policy "Public delete dossier files"
-on storage.objects
-for delete
-to anon, authenticated
-using (bucket_id = 'dossier-files');
-```
+Add login/auth and move ownership from `username` to authenticated `user_id` with stricter RLS policies.
