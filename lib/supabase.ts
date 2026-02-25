@@ -34,6 +34,7 @@ export type Project = {
   live_url: string | null;
   github_url: string | null;
   image_url: string | null;
+  is_pinned?: boolean | null;
   created_at: string;
 };
 
@@ -45,6 +46,7 @@ export type NewProject = {
   live_url?: string | null;
   github_url?: string | null;
   image_url?: string | null;
+  is_pinned?: boolean | null;
 };
 
 export type UpdateProject = {
@@ -54,6 +56,32 @@ export type UpdateProject = {
   live_url?: string | null;
   github_url?: string | null;
   image_url?: string | null;
+  is_pinned?: boolean | null;
+};
+
+export type ProfileSettings = {
+  id: string;
+  username: string;
+  full_name: string | null;
+  role_title: string | null;
+  tagline: string | null;
+  location: string | null;
+  email: string | null;
+  linkedin_url: string | null;
+  github_url: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type UpsertProfileSettings = {
+  username: string;
+  full_name?: string | null;
+  role_title?: string | null;
+  tagline?: string | null;
+  location?: string | null;
+  email?: string | null;
+  linkedin_url?: string | null;
+  github_url?: string | null;
 };
 
 export async function getLatestCV() {
@@ -73,6 +101,34 @@ export async function getLatestCV() {
     .getPublicUrl(`cvs/${data[0].name}`);
 
   return urlData.publicUrl;
+}
+
+export async function getProfileSettings(username: string) {
+  const { data, error } = await supabase
+    .from('profile_settings')
+    .select('*')
+    .eq('username', username)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data as ProfileSettings | null;
+}
+
+export async function upsertProfileSettings(input: UpsertProfileSettings) {
+  const { data, error } = await supabase
+    .from('profile_settings')
+    .upsert(input, { onConflict: 'username' })
+    .select('*')
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data as ProfileSettings;
 }
 
 export async function getJobs(username: string) {
@@ -116,17 +172,36 @@ export async function deleteJob(jobId: string) {
 }
 
 export async function getProjects(username: string) {
-  const { data, error } = await supabase
+  const pinnedQuery = await supabase
+    .from('projects')
+    .select('*')
+    .eq('username', username)
+    .order('is_pinned', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (!pinnedQuery.error) {
+    return (pinnedQuery.data ?? []) as Project[];
+  }
+
+  const shouldFallbackToLegacyOrder = pinnedQuery.error.message
+    .toLowerCase()
+    .includes('is_pinned');
+
+  if (!shouldFallbackToLegacyOrder) {
+    throw pinnedQuery.error;
+  }
+
+  const legacyQuery = await supabase
     .from('projects')
     .select('*')
     .eq('username', username)
     .order('created_at', { ascending: false });
 
-  if (error) {
-    throw error;
+  if (legacyQuery.error) {
+    throw legacyQuery.error;
   }
 
-  return (data ?? []) as Project[];
+  return (legacyQuery.data ?? []) as Project[];
 }
 
 export async function createProject(project: NewProject) {

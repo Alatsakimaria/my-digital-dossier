@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import {
   Code2,
@@ -15,6 +15,7 @@ import {
   Save,
   ChevronLeft,
   ChevronRight,
+  Pin,
 } from 'lucide-react';
 import {
   addProjectImages,
@@ -30,6 +31,7 @@ import { supabase } from '@/lib/supabase';
 
 type ProjectsProps = {
   username: string;
+  onProjectsChanged?: (projects: Project[]) => void;
 };
 
 type ProjectImage = {
@@ -38,7 +40,7 @@ type ProjectImage = {
   path: string;
 };
 
-export default function Projects({ username }: ProjectsProps) {
+export default function Projects({ username, onProjectsChanged }: ProjectsProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [githubRepos, setGithubRepos] = useState<GithubRepo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -54,6 +56,7 @@ export default function Projects({ username }: ProjectsProps) {
   const [isUploadingProjectPhotos, setIsUploadingProjectPhotos] = useState(false);
   const [projectModalError, setProjectModalError] = useState<string | null>(null);
   const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null);
+  const [togglingPinId, setTogglingPinId] = useState<string | null>(null);
   const [isEditingProject, setIsEditingProject] = useState(false);
   const [isUpdatingProject, setIsUpdatingProject] = useState(false);
   const [editProjectName, setEditProjectName] = useState('');
@@ -61,12 +64,23 @@ export default function Projects({ username }: ProjectsProps) {
   const [editProjectTechStack, setEditProjectTechStack] = useState('');
   const [editProjectLiveUrl, setEditProjectLiveUrl] = useState('');
   const [editProjectGithubUrl, setEditProjectGithubUrl] = useState('');
+  const [editProjectPinned, setEditProjectPinned] = useState(false);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [techStack, setTechStack] = useState('');
   const [liveUrl, setLiveUrl] = useState('');
   const [githubUrl, setGithubUrl] = useState('');
+  const [isPinned, setIsPinned] = useState(false);
+
+  const sortedProjects = useMemo(
+    () =>
+      [...projects].sort(
+        (a, b) =>
+          Number(Boolean(b.is_pinned)) - Number(Boolean(a.is_pinned)),
+      ),
+    [projects],
+  );
 
   const loadProjects = useCallback(async () => {
     setIsLoading(true);
@@ -97,6 +111,10 @@ export default function Projects({ username }: ProjectsProps) {
     loadProjects();
   }, [loadProjects]);
 
+  useEffect(() => {
+    onProjectsChanged?.(projects);
+  }, [projects, onProjectsChanged]);
+
   const clearForm = () => {
     setName('');
     setDescription('');
@@ -104,6 +122,7 @@ export default function Projects({ username }: ProjectsProps) {
     setLiveUrl('');
     setGithubUrl('');
     setProjectImage(null);
+    setIsPinned(false);
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -164,6 +183,7 @@ export default function Projects({ username }: ProjectsProps) {
         live_url: liveUrl || null,
         github_url: githubUrl || null,
         image_url: projectImage?.url || null,
+        is_pinned: isPinned,
       });
 
       await loadProjects();
@@ -230,6 +250,7 @@ export default function Projects({ username }: ProjectsProps) {
     setEditProjectTechStack(project.tech_stack || '');
     setEditProjectLiveUrl(project.live_url || '');
     setEditProjectGithubUrl(project.github_url || '');
+    setEditProjectPinned(Boolean(project.is_pinned));
     await loadProjectPhotos(project);
   };
 
@@ -261,6 +282,7 @@ export default function Projects({ username }: ProjectsProps) {
         tech_stack: editProjectTechStack.trim() || null,
         live_url: editProjectLiveUrl.trim() || null,
         github_url: editProjectGithubUrl.trim() || null,
+        is_pinned: editProjectPinned,
       });
 
       setSelectedProject(updatedProject);
@@ -271,6 +293,25 @@ export default function Projects({ username }: ProjectsProps) {
       setProjectModalError(message);
     } finally {
       setIsUpdatingProject(false);
+    }
+  };
+
+  const handleTogglePinned = async (project: Project) => {
+    setTogglingPinId(project.id);
+    setError(null);
+
+    try {
+      const updatedProject = await updateProject(project.id, {
+        is_pinned: !project.is_pinned,
+      });
+
+      setProjects((prev) => prev.map((item) => (item.id === updatedProject.id ? updatedProject : item)));
+      setSelectedProject((prev) => (prev && prev.id === updatedProject.id ? updatedProject : prev));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Could not update pin status.';
+      setError(message);
+    } finally {
+      setTogglingPinId(null);
     }
   };
 
@@ -446,6 +487,16 @@ export default function Projects({ username }: ProjectsProps) {
             </div>
           </div>
 
+          <label className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700">
+            <input
+              type="checkbox"
+              checked={isPinned}
+              onChange={(e) => setIsPinned(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-200"
+            />
+            Pin this project as one of my best
+          </label>
+
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Project image (optional)
@@ -534,7 +585,7 @@ export default function Projects({ username }: ProjectsProps) {
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
               {/* Manual projects */}
-              {projects.map((project) => {
+              {sortedProjects.map((project) => {
                 const primaryUrl = project.github_url || project.live_url;
                 const isGithubPrimary = Boolean(project.github_url);
 
@@ -545,13 +596,31 @@ export default function Projects({ username }: ProjectsProps) {
                     className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow h-[200px] flex flex-col cursor-pointer"
                   >
                     <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <h5 className="font-bold text-gray-900 text-lg truncate">
-                          {project.name}
-                        </h5>
-                        <span className="text-xs font-semibold bg-blue-100 text-blue-700 px-2 py-1 rounded-full whitespace-nowrap">
-                          Custom
-                        </span>
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                          <h5 className="font-bold text-gray-900 text-lg truncate">
+                            {project.name}
+                          </h5>
+                          <span className="text-xs font-semibold bg-blue-100 text-blue-700 px-2 py-1 rounded-full whitespace-nowrap">
+                            Custom
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleTogglePinned(project);
+                          }}
+                          disabled={togglingPinId === project.id}
+                          className={
+                            project.is_pinned
+                              ? 'text-xs font-semibold text-amber-700 border border-amber-200 bg-amber-100 rounded-full px-2 py-1 hover:bg-amber-200 disabled:opacity-50 inline-flex items-center gap-1 whitespace-nowrap'
+                              : 'text-xs font-semibold text-gray-600 border border-gray-200 bg-gray-50 rounded-full px-2 py-1 hover:bg-gray-100 disabled:opacity-50 inline-flex items-center gap-1 whitespace-nowrap'
+                          }
+                        >
+                          <Pin size={10} />
+                          {togglingPinId === project.id ? 'Saving...' : project.is_pinned ? 'Pinned' : 'Pin'}
+                        </button>
                       </div>
                       <p className="text-sm text-gray-600 mt-2 line-clamp-2">
                         {project.description}
@@ -710,6 +779,7 @@ export default function Projects({ username }: ProjectsProps) {
                               setEditProjectTechStack(selectedProject.tech_stack || '');
                               setEditProjectLiveUrl(selectedProject.live_url || '');
                               setEditProjectGithubUrl(selectedProject.github_url || '');
+                              setEditProjectPinned(Boolean(selectedProject.is_pinned));
                             }}
                             disabled={isUpdatingProject}
                             className="px-4 py-2 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
@@ -806,6 +876,15 @@ export default function Projects({ username }: ProjectsProps) {
                             className="border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
                           />
                         </div>
+                        <label className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={editProjectPinned}
+                            onChange={(e) => setEditProjectPinned(e.target.checked)}
+                            className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-200"
+                          />
+                          Pin this project on Home and Projects
+                        </label>
                       </div>
                     )}
                     {isEditingProject && (
