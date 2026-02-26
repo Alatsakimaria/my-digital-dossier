@@ -7,6 +7,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export type Job = {
   id: string;
+  auth_user_id?: string | null;
   username: string;
   title: string;
   company: string;
@@ -17,6 +18,7 @@ export type Job = {
 };
 
 export type NewJob = {
+  auth_user_id?: string | null;
   username: string;
   title: string;
   company: string;
@@ -27,6 +29,7 @@ export type NewJob = {
 
 export type Project = {
   id: string;
+  auth_user_id?: string | null;
   username: string;
   name: string;
   description: string;
@@ -39,6 +42,7 @@ export type Project = {
 };
 
 export type NewProject = {
+  auth_user_id?: string | null;
   username: string;
   name: string;
   description: string;
@@ -61,6 +65,7 @@ export type UpdateProject = {
 
 export type ProfileSettings = {
   id: string;
+  auth_user_id?: string | null;
   username: string;
   full_name: string | null;
   role_title: string | null;
@@ -74,6 +79,7 @@ export type ProfileSettings = {
 };
 
 export type UpsertProfileSettings = {
+  auth_user_id?: string | null;
   username: string;
   full_name?: string | null;
   role_title?: string | null;
@@ -82,6 +88,31 @@ export type UpsertProfileSettings = {
   email?: string | null;
   linkedin_url?: string | null;
   github_url?: string | null;
+};
+
+export type AppUser = {
+  id: string;
+  auth_user_id: string;
+  username: string;
+  email: string | null;
+  full_name: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type UpsertAppUser = {
+  auth_user_id: string;
+  username: string;
+  email?: string | null;
+  full_name?: string | null;
+};
+
+export type LocalUser = {
+  id: string;
+  username: string;
+  full_name: string | null;
+  password: string;
+  created_at: string;
 };
 
 export async function getLatestCV() {
@@ -103,7 +134,19 @@ export async function getLatestCV() {
   return urlData.publicUrl;
 }
 
-export async function getProfileSettings(username: string) {
+export async function getProfileSettings(username: string, authUserId?: string | null) {
+  const byAuthQuery = authUserId
+    ? await supabase
+        .from('profile_settings')
+        .select('*')
+        .eq('auth_user_id', authUserId)
+        .maybeSingle()
+    : null;
+
+  if (byAuthQuery && !byAuthQuery.error && byAuthQuery.data) {
+    return byAuthQuery.data as ProfileSettings;
+  }
+
   const { data, error } = await supabase
     .from('profile_settings')
     .select('*')
@@ -131,7 +174,84 @@ export async function upsertProfileSettings(input: UpsertProfileSettings) {
   return data as ProfileSettings;
 }
 
-export async function getJobs(username: string) {
+export async function getAppUserByAuthId(authUserId: string) {
+  const { data, error } = await supabase
+    .from('app_users')
+    .select('*')
+    .eq('auth_user_id', authUserId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data as AppUser | null;
+}
+
+export async function upsertAppUser(input: UpsertAppUser) {
+  const { data, error } = await supabase
+    .from('app_users')
+    .upsert(input, { onConflict: 'auth_user_id' })
+    .select('*')
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data as AppUser;
+}
+
+export async function getLocalUserByUsername(username: string) {
+  const { data, error } = await supabase
+    .from('local_users')
+    .select('*')
+    .eq('username', username)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data as LocalUser | null;
+}
+
+export async function createLocalUser(input: {
+  username: string;
+  full_name?: string | null;
+  password: string;
+}) {
+  const { data, error } = await supabase
+    .from('local_users')
+    .insert({
+      username: input.username,
+      full_name: input.full_name ?? null,
+      password: input.password,
+    })
+    .select('*')
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data as LocalUser;
+}
+
+export async function getJobs(username: string, authUserId?: string | null) {
+  const byAuthQuery = authUserId
+    ? await supabase
+        .from('jobs')
+        .select('*')
+        .eq('auth_user_id', authUserId)
+        .order('start_date', { ascending: false })
+        .order('created_at', { ascending: false })
+    : null;
+
+  if (byAuthQuery && !byAuthQuery.error && (byAuthQuery.data?.length ?? 0) > 0) {
+    return (byAuthQuery.data ?? []) as Job[];
+  }
+
   const { data, error } = await supabase
     .from('jobs')
     .select('*')
@@ -171,7 +291,20 @@ export async function deleteJob(jobId: string) {
   }
 }
 
-export async function getProjects(username: string) {
+export async function getProjects(username: string, authUserId?: string | null) {
+  const pinnedByAuthQuery = authUserId
+    ? await supabase
+        .from('projects')
+        .select('*')
+        .eq('auth_user_id', authUserId)
+        .order('is_pinned', { ascending: false })
+        .order('created_at', { ascending: false })
+    : null;
+
+  if (pinnedByAuthQuery && !pinnedByAuthQuery.error && (pinnedByAuthQuery.data?.length ?? 0) > 0) {
+    return (pinnedByAuthQuery.data ?? []) as Project[];
+  }
+
   const pinnedQuery = await supabase
     .from('projects')
     .select('*')

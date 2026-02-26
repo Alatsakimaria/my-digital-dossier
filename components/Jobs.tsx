@@ -6,9 +6,10 @@ import { createJob, deleteJob, getJobs, type Job } from '@/lib/supabase';
 
 type JobsProps = {
   username: string;
+  authUserId?: string | null;
 };
 
-export default function Jobs({ username }: JobsProps) {
+export default function Jobs({ username, authUserId }: JobsProps) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -27,7 +28,7 @@ export default function Jobs({ username }: JobsProps) {
     setError(null);
 
     try {
-      const data = await getJobs(username);
+      const data = await getJobs(username, authUserId);
       setJobs(data);
       setIsFormOpen(data.length === 0);
     } catch {
@@ -35,7 +36,7 @@ export default function Jobs({ username }: JobsProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [username]);
+  }, [authUserId, username]);
 
   useEffect(() => {
     loadJobs();
@@ -62,6 +63,7 @@ export default function Jobs({ username }: JobsProps) {
 
     try {
       await createJob({
+        auth_user_id: authUserId ?? null,
         username,
         title,
         company,

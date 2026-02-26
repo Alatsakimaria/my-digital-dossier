@@ -31,6 +31,7 @@ import { supabase } from '@/lib/supabase';
 
 type ProjectsProps = {
   username: string;
+  authUserId?: string | null;
   onProjectsChanged?: (projects: Project[]) => void;
 };
 
@@ -40,7 +41,7 @@ type ProjectImage = {
   path: string;
 };
 
-export default function Projects({ username, onProjectsChanged }: ProjectsProps) {
+export default function Projects({ username, authUserId, onProjectsChanged }: ProjectsProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [githubRepos, setGithubRepos] = useState<GithubRepo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -88,7 +89,7 @@ export default function Projects({ username, onProjectsChanged }: ProjectsProps)
 
     try {
       // Load manual projects
-      const manualProjects = await getProjects(username);
+      const manualProjects = await getProjects(username, authUserId);
       setProjects(manualProjects);
 
       // Load GitHub repos
@@ -105,7 +106,7 @@ export default function Projects({ username, onProjectsChanged }: ProjectsProps)
     } finally {
       setIsLoading(false);
     }
-  }, [username]);
+  }, [authUserId, username]);
 
   useEffect(() => {
     loadProjects();
@@ -176,6 +177,7 @@ export default function Projects({ username, onProjectsChanged }: ProjectsProps)
 
     try {
       await createProject({
+        auth_user_id: authUserId ?? null,
         username,
         name,
         description,

@@ -1,12 +1,31 @@
 # My Digital Dossier
 
-A portfolio web app built with Next.js + Supabase.
+Portfolio web app built with Next.js + Supabase.
 
-It includes:
-- Portfolio Home (editable profile hero)
-- Projects tab (manual projects, gallery uploads, pin/unpin best projects)
-- Jobs tab (work experience CRUD)
+## Features
+
+- Login first flow (`/` redirects to `/login`)
+- Dashboard route (`/dashboard`) with portfolio overview
+- Editable profile hero (name, title, tagline, links)
+- Jobs tab (create/delete work experience)
+- Projects tab (create/edit/delete, image galleries, pin best projects)
 - Vault tab (file storage in Supabase bucket)
+
+## Current Routing
+
+- [app/page.tsx](app/page.tsx) → redirects to `/login`
+- [app/login/page.tsx](app/login/page.tsx) → username/full-name/password auth page
+- [app/dashboard/page.tsx](app/dashboard/page.tsx) → main app dashboard
+
+## Auth Model (Current)
+
+For testing, auth is implemented with a `local_users` table and browser local session storage.
+
+- Signup uses: `username`, `full_name`, `password`
+- Login uses: `username`, `password`
+- Logged-in user is stored in `localStorage` as `dossier_local_user`
+
+Note: this is a testing setup and is **not production secure** (plain password storage).
 
 ## Tech Stack
 
@@ -18,67 +37,58 @@ It includes:
 
 ## Local Development
 
-1. Install dependencies:
+1. Install dependencies
 
 ```bash
 npm install
 ```
 
-2. Create `.env.local` with:
+2. Create `.env.local`
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-3. Start dev server:
+3. Run app
 
 ```bash
 npm run dev
 ```
 
-4. Open http://localhost:3000
+4. Open `http://localhost:3000`
 
-## Database Setup (Supabase)
+## Supabase Setup
 
-Run the SQL migrations in Supabase SQL Editor.
+Run these SQL files in Supabase SQL Editor.
 
-Required files:
+### Required (current app)
+
 - [sql/2026-02-25-project-images.sql](sql/2026-02-25-project-images.sql)
 - [sql/2026-02-25-profile-settings.sql](sql/2026-02-25-profile-settings.sql)
 - [sql/2026-02-25-project-pinning.sql](sql/2026-02-25-project-pinning.sql)
+- [sql/2026-02-26-storage-policies.sql](sql/2026-02-26-storage-policies.sql)
+- [sql/2026-02-26-local-users.sql](sql/2026-02-26-local-users.sql)
 
-These add:
-- `project_images` table for project gallery photos
-- `profile_settings` table for editable home profile content
-- `projects.is_pinned` column for best-project pinning
+### Optional / legacy experiments
 
-Also ensure your existing `jobs` and `projects` tables + policies are already created in Supabase.
+- [sql/2026-02-26-app-users-auth.sql](sql/2026-02-26-app-users-auth.sql)
+- [sql/2026-02-26-user-ownership-backfill.sql](sql/2026-02-26-user-ownership-backfill.sql)
 
-## Storage Setup
+## Storage
 
-Create a Supabase Storage bucket named `dossier-files`.
+Bucket required: `dossier-files`
 
-Make sure storage policies allow:
-- read
-- insert
-- delete
-
-for `anon` and `authenticated` roles (current MVP setup).
-
-## Important Current Behavior
-
-- Authentication is intentionally not implemented yet.
-- The app currently uses a fixed username in [app/page.tsx](app/page.tsx) for MVP (`Alatsakimaria`).
-- Data is stored per `username`.
+Ensure policies allow read/insert/update/delete as defined in:
+- [sql/2026-02-26-storage-policies.sql](sql/2026-02-26-storage-policies.sql)
 
 ## Scripts
 
-- `npm run dev` - start development server
-- `npm run build` - production build
-- `npm run start` - run production server
-- `npm run lint` - run ESLint
+- `npm run dev` → development server
+- `npm run build` → production build
+- `npm run start` → production server
+- `npm run lint` → ESLint
 
-## Next Planned Step
+## Next Step
 
-Add login/auth and move ownership from `username` to authenticated `user_id` with stricter RLS policies.
+Replace testing auth with secure Supabase Auth (or custom backend auth), hash passwords, and enforce strict per-user RLS.
