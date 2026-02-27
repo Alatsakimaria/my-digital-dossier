@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { Loader2, LockKeyhole, UserRound } from 'lucide-react';
 import { createLocalUser, getLocalUserByUsername } from '@/lib/supabase';
 
@@ -9,6 +10,7 @@ type AuthMode = 'login' | 'signup';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [mode, setMode] = useState<AuthMode>('login');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
@@ -24,6 +26,16 @@ export default function LoginPage() {
       .replace(/\s+/g, '_')
       .replace(/[^a-z0-9_]/g, '')
       .slice(0, 24);
+
+  useEffect(() => {
+    const requestedMode = searchParams.get('mode');
+    if (requestedMode === 'signup') {
+      setMode('signup');
+      return;
+    }
+
+    setMode('login');
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -220,6 +232,13 @@ export default function LoginPage() {
             ? 'No account? Create one'
             : 'Already have an account? Login'}
         </button>
+
+        <Link
+          href="/"
+          className="block w-full mt-2 text-center text-sm font-semibold text-indigo-600 hover:text-indigo-700"
+        >
+          Back to welcome page
+        </Link>
       </div>
     </main>
   );

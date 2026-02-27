@@ -12,7 +12,7 @@ export default async function PublicProfile({
 
   // 1. Fetch Real Data in Parallel
   const [cvUrl, repos] = await Promise.all([
-    getLatestCV(),
+    getLatestCV(username),
     getGithubRepos(username) // This uses the name from the URL
   ]);
 

@@ -74,6 +74,7 @@ export type ProfileSettings = {
   email: string | null;
   linkedin_url: string | null;
   github_url: string | null;
+  github_username?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -88,6 +89,7 @@ export type UpsertProfileSettings = {
   email?: string | null;
   linkedin_url?: string | null;
   github_url?: string | null;
+  github_username?: string | null;
 };
 
 export type AppUser = {
@@ -115,11 +117,11 @@ export type LocalUser = {
   created_at: string;
 };
 
-export async function getLatestCV() {
-  // 1. Get the list of files in the 'cvs' folder, sorted by newest
+export async function getLatestCV(username: string) {
+  // 1. Get the list of files in the user's CV folder, sorted by newest
   const { data, error } = await supabase.storage
     .from('dossier-files')
-    .list('cvs', {
+    .list(`cvs/${username}`, {
       limit: 1,
       sortBy: { column: 'created_at', order: 'desc' },
     });
@@ -129,7 +131,7 @@ export async function getLatestCV() {
   // 2. Generate the public link for that specific file
   const { data: urlData } = supabase.storage
     .from('dossier-files')
-    .getPublicUrl(`cvs/${data[0].name}`);
+    .getPublicUrl(`cvs/${username}/${data[0].name}`);
 
   return urlData.publicUrl;
 }
@@ -161,17 +163,37 @@ export async function getProfileSettings(username: string, authUserId?: string |
 }
 
 export async function upsertProfileSettings(input: UpsertProfileSettings) {
-  const { data, error } = await supabase
+  const firstTry = await supabase
     .from('profile_settings')
     .upsert(input, { onConflict: 'username' })
     .select('*')
     .single();
 
-  if (error) {
-    throw error;
+  if (!firstTry.error) {
+    return firstTry.data as ProfileSettings;
   }
 
-  return data as ProfileSettings;
+  const isMissingGithubUsernameColumn = firstTry.error.message
+    .toLowerCase()
+    .includes('github_username');
+
+  if (!isMissingGithubUsernameColumn) {
+    throw firstTry.error;
+  }
+
+  const { github_username: _unusedGithubUsername, ...legacyInput } = input;
+
+  const fallbackTry = await supabase
+    .from('profile_settings')
+    .upsert(legacyInput, { onConflict: 'username' })
+    .select('*')
+    .single();
+
+  if (fallbackTry.error) {
+    throw fallbackTry.error;
+  }
+
+  return fallbackTry.data as ProfileSettings;
 }
 
 export async function getAppUserByAuthId(authUserId: string) {

@@ -11,7 +11,11 @@ type UploadedDoc = {
   path: string;
 };
 
-export default function Vault() {
+type VaultProps = {
+  username: string;
+};
+
+export default function Vault({ username }: VaultProps) {
   const [cvFiles, setCvFiles] = useState<UploadedDoc[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isUploadingGrades, setIsUploadingGrades] = useState(false);
@@ -21,13 +25,13 @@ export default function Vault() {
     const loadFiles = async () => {
       try {
         const [{ data: cvData }, { data: gradeData }] = await Promise.all([
-          supabase.storage.from('dossier-files').list('cvs', { limit: 50, sortBy: { column: 'created_at', order: 'desc' } }),
-          supabase.storage.from('dossier-files').list('grades', { limit: 50, sortBy: { column: 'created_at', order: 'desc' } }),
+          supabase.storage.from('dossier-files').list(`cvs/${username}`, { limit: 50, sortBy: { column: 'created_at', order: 'desc' } }),
+          supabase.storage.from('dossier-files').list(`grades/${username}`, { limit: 50, sortBy: { column: 'created_at', order: 'desc' } }),
         ]);
 
         if (cvData) {
           const mapped = cvData.map((file) => {
-            const path = `cvs/${file.name}`;
+            const path = `cvs/${username}/${file.name}`;
             const { data: urlData } = supabase.storage
               .from('dossier-files')
               .getPublicUrl(path);
@@ -38,7 +42,7 @@ export default function Vault() {
 
         if (gradeData) {
           const mapped = gradeData.map((file) => {
-            const path = `grades/${file.name}`;
+            const path = `grades/${username}/${file.name}`;
             const { data: urlData } = supabase.storage
               .from('dossier-files')
               .getPublicUrl(path);
@@ -53,7 +57,7 @@ export default function Vault() {
     };
 
     loadFiles();
-  }, []);
+  }, [username]);
 
   // 2. Updated function to handle REAL cloud upload
   const handleCvChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -63,7 +67,7 @@ export default function Vault() {
     setIsUploading(true);
     
     try {
-      const filePath = `cvs/${Date.now()}_${file.name}`;
+      const filePath = `cvs/${username}/${Date.now()}_${file.name}`;
       const { data, error } = await supabase.storage
         .from('dossier-files')
         .upload(filePath, file);
@@ -99,7 +103,7 @@ export default function Vault() {
 
     try {
       const uploads = Array.from(e.target.files).map(async (file) => {
-        const filePath = `grades/${Date.now()}_${file.name}`;
+        const filePath = `grades/${username}/${Date.now()}_${file.name}`;
         const { error } = await supabase.storage
           .from('dossier-files')
           .upload(filePath, file);

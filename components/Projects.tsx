@@ -32,6 +32,7 @@ import { supabase } from '@/lib/supabase';
 type ProjectsProps = {
   username: string;
   authUserId?: string | null;
+  githubUsername?: string | null;
   onProjectsChanged?: (projects: Project[]) => void;
 };
 
@@ -41,7 +42,7 @@ type ProjectImage = {
   path: string;
 };
 
-export default function Projects({ username, authUserId, onProjectsChanged }: ProjectsProps) {
+export default function Projects({ username, authUserId, githubUsername, onProjectsChanged }: ProjectsProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [githubRepos, setGithubRepos] = useState<GithubRepo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -94,8 +95,12 @@ export default function Projects({ username, authUserId, onProjectsChanged }: Pr
 
       // Load GitHub repos
       try {
-        const repos = await getGithubRepos(username);
-        setGithubRepos(repos);
+        if (githubUsername) {
+          const repos = await getGithubRepos(githubUsername);
+          setGithubRepos(repos);
+        } else {
+          setGithubRepos([]);
+        }
       } catch {
         console.log('Could not load GitHub repos, continuing with manual projects only');
       }
@@ -106,7 +111,7 @@ export default function Projects({ username, authUserId, onProjectsChanged }: Pr
     } finally {
       setIsLoading(false);
     }
-  }, [authUserId, username]);
+  }, [authUserId, githubUsername, username]);
 
   useEffect(() => {
     loadProjects();

@@ -52,7 +52,26 @@ export default function Home() {
     email: '',
     linkedin_url: '',
     github_url: '',
+    github_username: '',
   });
+
+  const connectedGithubUsername = useMemo(() => {
+    const explicitUsername = profileForm.github_username?.trim();
+    if (explicitUsername) return explicitUsername;
+
+    const raw = profileForm.github_url?.trim();
+    if (!raw) return null;
+
+    try {
+      const normalized = raw.startsWith('http') ? raw : `https://${raw}`;
+      const parsed = new URL(normalized);
+      if (!parsed.hostname.includes('github.com')) return null;
+      const pathParts = parsed.pathname.split('/').filter(Boolean);
+      return pathParts[0] ?? null;
+    } catch {
+      return null;
+    }
+  }, [profileForm.github_url]);
 
   const buildDefaultProfileForm = useCallback(
     (username: string, email: string | null, data?: ProfileSettings | null) => ({
@@ -64,7 +83,8 @@ export default function Home() {
       location: data?.location ?? 'Athens, Greece',
       email: data?.email ?? email ?? `contact@${username}.com`,
       linkedin_url: data?.linkedin_url ?? '',
-      github_url: data?.github_url ?? `https://github.com/${username}`,
+      github_url: data?.github_url ?? '',
+      github_username: data?.github_username ?? '',
     }),
     [],
   );
@@ -221,6 +241,7 @@ export default function Home() {
         email: profileForm.email.trim() || null,
         linkedin_url: profileForm.linkedin_url.trim() || null,
         github_url: profileForm.github_url.trim() || null,
+        github_username: profileForm.github_username.trim() || null,
       });
 
       setProfile(saved);
@@ -381,9 +402,12 @@ export default function Home() {
                             LinkedIn
                           </a>
                         )}
-                        {profileForm.github_url && (
+                        {(profileForm.github_url || connectedGithubUsername) && (
                           <a
-                            href={profileForm.github_url}
+                            href={
+                              profileForm.github_url ||
+                              `https://github.com/${connectedGithubUsername}`
+                            }
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-sm font-semibold text-gray-700 hover:text-gray-900"
@@ -479,6 +503,14 @@ export default function Home() {
                         value={profileForm.linkedin_url}
                         onChange={(e) => handleProfileFieldChange('linkedin_url', e.target.value)}
                         placeholder="LinkedIn URL"
+                        className="border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                      />
+                      <input
+                        value={profileForm.github_username}
+                        onChange={(e) =>
+                          handleProfileFieldChange('github_username', e.target.value)
+                        }
+                        placeholder="GitHub username for import (e.g. octocat)"
                         className="border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
                       />
                       <input
@@ -641,12 +673,13 @@ export default function Home() {
               </div>
             )}
 
-            {activeTab === 'vault' && <Vault />}
+            {activeTab === 'vault' && <Vault username={profileUsername} />}
             {activeTab === 'jobs' && <Jobs username={profileUsername} authUserId={authUserId} />}
             {activeTab === 'projects' && (
               <Projects
                 username={profileUsername}
                 authUserId={authUserId}
+                githubUsername={connectedGithubUsername}
                 onProjectsChanged={handleProjectsChanged}
               />
             )}
