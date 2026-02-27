@@ -2,30 +2,56 @@
 
 Portfolio web app built with Next.js + Supabase.
 
-## Features
+## What it is
 
-- Login first flow (`/` redirects to `/login`)
-- Dashboard route (`/dashboard`) with portfolio overview
-- Editable profile hero (name, title, tagline, links)
-- Jobs tab (create/delete work experience)
-- Projects tab (create/edit/delete, image galleries, pin best projects)
-- Vault tab (file storage in Supabase bucket)
+My Digital Dossier is a focused portfolio workspace where a user can:
 
-## Current Routing
+- build a public-ready profile,
+- manage jobs and projects,
+- import GitHub repositories,
+- upload personal documents (CV + grades),
+- and present a clean portfolio dashboard.
 
-- [app/page.tsx](app/page.tsx) → redirects to `/login`
-- [app/login/page.tsx](app/login/page.tsx) → username/full-name/password auth page
-- [app/dashboard/page.tsx](app/dashboard/page.tsx) → main app dashboard
+## Current User Flow
+
+- `/` → public welcome page with branding/logo and CTAs.
+- `/login` → login form.
+- `/login?mode=signup` → create-account form directly.
+- `/dashboard` → authenticated app area (Dashboard, Jobs, Projects, Vault).
+
+## Core Features
+
+- Welcome page with subtle animations and brand/logo block.
+- Local auth for testing (`username`, `full_name`, `password`).
+- Dashboard overview with editable profile details.
+- Jobs management with modern month/year date inputs.
+- Projects management:
+	- create/edit/delete,
+	- image upload + gallery,
+	- pin/unpin featured projects,
+	- GitHub repo import from a dedicated GitHub username.
+- Vault management:
+	- CV files stored per user in `cvs/<username>/...`,
+	- grade files stored per user in `grades/<username>/...`.
+- Public profile route: `/profile/[username]`.
+
+## GitHub Connection
+
+GitHub project import is **decoupled** from app username.
+
+- Set `github_username` in profile settings.
+- If missing, app can fall back to parsing `github_url`.
+- Projects tab imports repos from that GitHub account.
 
 ## Auth Model (Current)
 
-For testing, auth is implemented with a `local_users` table and browser local session storage.
+Testing auth is implemented with a `local_users` table + browser local session storage.
 
-- Signup uses: `username`, `full_name`, `password`
-- Login uses: `username`, `password`
-- Logged-in user is stored in `localStorage` as `dossier_local_user`
+- Signup: `username`, `full_name`, `password`
+- Login: `username`, `password`
+- Local session key: `dossier_local_user`
 
-Note: this is a testing setup and is **not production secure** (plain password storage).
+⚠️ This is a testing setup and **not production secure** (plain password storage).
 
 ## Tech Stack
 
@@ -50,13 +76,17 @@ NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-3. Run app
+3. Add your landing logo (optional but recommended)
+
+- Place your logo at `public/logo.png`.
+
+4. Run app
 
 ```bash
 npm run dev
 ```
 
-4. Open `http://localhost:3000`
+5. Open `http://localhost:3000`
 
 ## Supabase Setup
 
@@ -69,6 +99,7 @@ Run these SQL files in Supabase SQL Editor.
 - [sql/2026-02-25-project-pinning.sql](sql/2026-02-25-project-pinning.sql)
 - [sql/2026-02-26-storage-policies.sql](sql/2026-02-26-storage-policies.sql)
 - [sql/2026-02-26-local-users.sql](sql/2026-02-26-local-users.sql)
+- [sql/2026-02-27-profile-github-username.sql](sql/2026-02-27-profile-github-username.sql)
 
 ### Optional / legacy experiments
 
@@ -77,9 +108,9 @@ Run these SQL files in Supabase SQL Editor.
 
 ## Storage
 
-Bucket required: `dossier-files`
+Required bucket: `dossier-files`
 
-Ensure policies allow read/insert/update/delete as defined in:
+Policies are defined in:
 - [sql/2026-02-26-storage-policies.sql](sql/2026-02-26-storage-policies.sql)
 
 ## Scripts
@@ -89,6 +120,10 @@ Ensure policies allow read/insert/update/delete as defined in:
 - `npm run start` → production server
 - `npm run lint` → ESLint
 
-## Next Step
+## Recommended Next Step
 
-Replace testing auth with secure Supabase Auth (or custom backend auth), hash passwords, and enforce strict per-user RLS.
+Move from local testing auth to secure auth:
+
+- hash passwords,
+- enforce strict per-user RLS,
+- and replace localStorage sessions with secure server/session auth.
