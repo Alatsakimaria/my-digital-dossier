@@ -35,6 +35,30 @@ My Digital Dossier is a focused portfolio workspace where a user can:
 	- grade files stored per user in `grades/<username>/...`.
 - Public profile route: `/profile/[username]`.
 
+## Screenshots
+
+### Welcome Page
+
+![Welcome Page](public/Welcomepage.png)
+
+### Login / Signup
+
+![Login Page](public/Login.png)
+
+![Signup Page](public/Sign%20up.png)
+
+### Work Experience
+
+![Work Experience](public/WorkExperience.png)
+
+### Projects Tab
+
+![Projects Tab](public/Projects.png)
+
+### Vault Tab
+
+![Vault Tab](public/Vault.png)
+
 ## GitHub Connection
 
 GitHub project import is **decoupled** from app username.
