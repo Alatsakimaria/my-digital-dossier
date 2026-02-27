@@ -10,6 +10,24 @@ type JobsProps = {
 };
 
 export default function Jobs({ username, authUserId }: JobsProps) {
+  const monthOptions = [
+    { value: '01', label: 'Jan' },
+    { value: '02', label: 'Feb' },
+    { value: '03', label: 'Mar' },
+    { value: '04', label: 'Apr' },
+    { value: '05', label: 'May' },
+    { value: '06', label: 'Jun' },
+    { value: '07', label: 'Jul' },
+    { value: '08', label: 'Aug' },
+    { value: '09', label: 'Sep' },
+    { value: '10', label: 'Oct' },
+    { value: '11', label: 'Nov' },
+    { value: '12', label: 'Dec' },
+  ];
+
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 40 }, (_, idx) => String(currentYear - idx));
+
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -19,9 +37,25 @@ export default function Jobs({ username, authUserId }: JobsProps) {
 
   const [title, setTitle] = useState('');
   const [company, setCompany] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startMonth, setStartMonth] = useState('');
+  const [startYear, setStartYear] = useState('');
+  const [endMonth, setEndMonth] = useState('');
+  const [endYear, setEndYear] = useState('');
   const [description, setDescription] = useState('');
+
+  const buildDate = (year: string, month: string) => `${year}-${month}-01`;
+
+  const formatMonthYear = (dateValue: string | null) => {
+    if (!dateValue) return 'Present';
+
+    const parsed = new Date(dateValue);
+    if (Number.isNaN(parsed.getTime())) return dateValue;
+
+    return parsed.toLocaleDateString('en-GB', {
+      month: 'short',
+      year: 'numeric',
+    });
+  };
 
   const loadJobs = useCallback(async () => {
     setIsLoading(true);
@@ -45,16 +79,23 @@ export default function Jobs({ username, authUserId }: JobsProps) {
   const clearForm = () => {
     setTitle('');
     setCompany('');
-    setStartDate('');
-    setEndDate('');
+    setStartMonth('');
+    setStartYear('');
+    setEndMonth('');
+    setEndYear('');
     setDescription('');
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (!title || !company || !startDate) {
+    if (!title || !company || !startMonth || !startYear) {
       setError('Title, company and start date are required.');
+      return;
+    }
+
+    if ((endMonth && !endYear) || (!endMonth && endYear)) {
+      setError('Please select both end month and end year, or leave both empty.');
       return;
     }
 
@@ -67,8 +108,8 @@ export default function Jobs({ username, authUserId }: JobsProps) {
         username,
         title,
         company,
-        start_date: startDate,
-        end_date: endDate || null,
+        start_date: buildDate(startYear, startMonth),
+        end_date: endMonth && endYear ? buildDate(endYear, endMonth) : null,
         description: description || null,
       });
 
@@ -151,22 +192,62 @@ export default function Jobs({ username, authUserId }: JobsProps) {
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Start date</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-              />
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={startMonth}
+                  onChange={(e) => setStartMonth(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                >
+                  <option value="">Month</option>
+                  {monthOptions.map((month) => (
+                    <option key={month.value} value={month.value}>
+                      {month.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={startYear}
+                  onChange={(e) => setStartYear(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                >
+                  <option value="">Year</option>
+                  {yearOptions.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">End date (optional)</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-              />
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={endMonth}
+                  onChange={(e) => setEndMonth(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                >
+                  <option value="">Month</option>
+                  {monthOptions.map((month) => (
+                    <option key={month.value} value={month.value}>
+                      {month.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={endYear}
+                  onChange={(e) => setEndYear(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                >
+                  <option value="">Year</option>
+                  {yearOptions.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
@@ -232,7 +313,7 @@ export default function Jobs({ username, authUserId }: JobsProps) {
                   <div className="flex items-center gap-2">
                     <p className="text-xs font-semibold text-gray-500 flex items-center gap-1 bg-gray-50 border border-gray-100 rounded-full px-3 py-1 h-fit">
                       <CalendarDays size={12} />
-                      {job.start_date} - {job.end_date ?? 'Present'}
+                      {formatMonthYear(job.start_date)} - {formatMonthYear(job.end_date)}
                     </p>
                     <button
                       type="button"
