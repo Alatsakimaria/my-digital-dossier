@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Loader2, LockKeyhole, UserRound } from 'lucide-react';
-import { createLocalUser, getLocalUserByUsername } from '@/lib/supabase';
 
 type AuthMode = 'login' | 'signup';
 
@@ -61,6 +60,8 @@ export default function LoginPage() {
 
       setIsSubmitting(true);
       try {
+        const { createLocalUser } = await import('@/lib/supabase');
+
         await createLocalUser({
           username: normalizedUsername,
           full_name: fullName.trim() || null,
@@ -93,6 +94,7 @@ export default function LoginPage() {
 
     setIsSubmitting(true);
     try {
+      const { getLocalUserByUsername } = await import('@/lib/supabase');
       const normalizedUsername = normalizeUsername(username);
       const user = await getLocalUserByUsername(normalizedUsername);
 
