@@ -181,7 +181,8 @@ export async function upsertProfileSettings(input: UpsertProfileSettings) {
     throw firstTry.error;
   }
 
-  const { github_username: _unusedGithubUsername, ...legacyInput } = input;
+  const legacyInput: UpsertProfileSettings = { ...input };
+  delete legacyInput.github_username;
 
   const fallbackTry = await supabase
     .from('profile_settings')

@@ -1,126 +1,242 @@
-import { Github, Linkedin, Mail, Download, MapPin, Star, ExternalLink } from 'lucide-react';
-import { getLatestCV } from '@/lib/supabase';
-import { getGithubRepos } from '@/lib/github'; // Import the GitHub fetcher
+import { Download, ExternalLink, Github, Linkedin, Mail, MapPin, Pin } from 'lucide-react';
+import { getJobs, getLatestCV, getProfileSettings, getProjects } from '@/lib/supabase';
 
-export default async function PublicProfile({ 
-  params 
-}: { 
-  params: Promise<{ username: string }> 
+export default async function PublicProfile({
+  params,
+}: {
+  params: Promise<{ username: string }>;
 }) {
   const resolvedParams = await params;
   const username = resolvedParams.username;
 
-  // 1. Fetch Real Data in Parallel
-  const [cvUrl, repos] = await Promise.all([
+  const [profile, projects, jobs, cvUrl] = await Promise.all([
+    getProfileSettings(username),
+    getProjects(username),
+    getJobs(username),
     getLatestCV(username),
-    getGithubRepos(username) // This uses the name from the URL
   ]);
 
+  const displayName = profile?.full_name || username;
+  const roleTitle = profile?.role_title || 'Portfolio Owner';
+  const tagline = profile?.tagline || 'Personal portfolio and proof-of-work profile.';
+  const location = profile?.location;
+  const email = profile?.email;
+  const linkedinUrl = profile?.linkedin_url;
+  const githubUrl = profile?.github_url;
+
+  const featuredProjects = [...projects]
+    .sort((a, b) => Number(Boolean(b.is_pinned)) - Number(Boolean(a.is_pinned)))
+    .slice(0, 6);
+
+  const skills = Array.from(
+    new Set(
+      projects
+        .flatMap((project) => (project.tech_stack ? project.tech_stack.split(',') : []))
+        .map((skill) => skill.trim())
+        .filter(Boolean),
+    ),
+  ).slice(0, 12);
+
+  const formatDateLabel = (value: string) => {
+    try {
+      return new Date(value).toLocaleDateString('en-GB', {
+        month: 'short',
+        year: 'numeric',
+      });
+    } catch {
+      return value;
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-white text-gray-900">
-      <header className="bg-[#1E1B33] text-white py-20 px-10">
-        <div className="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-end gap-6">
+    <main className="min-h-screen bg-gray-50 text-gray-900">
+      <header className="bg-[#1E1B33] text-white py-14 px-6 md:px-10">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-end md:justify-between gap-6">
           <div>
-            <h1 className="text-5xl font-extrabold capitalize">{username}</h1>
-            <p className="text-indigo-300 text-xl mt-2 font-medium">Software Engineer & Data Specialist</p>
-            <div className="flex gap-4 mt-6 text-gray-400">
-              <span className="flex items-center gap-1 text-sm"><MapPin size={16}/> Athens, Greece</span>
-              <span className="flex items-center gap-1 text-sm"><Mail size={16}/> contact@{username}.com</span>
+            <p className="text-xs font-bold uppercase tracking-widest text-indigo-300">Public Portfolio</p>
+            <h1 className="text-4xl md:text-5xl font-extrabold mt-3">{displayName}</h1>
+            <p className="text-indigo-200 text-lg mt-2 font-semibold">{roleTitle}</p>
+            <p className="text-indigo-100 mt-3 max-w-2xl">{tagline}</p>
+
+            <div className="flex flex-wrap gap-4 mt-5 text-indigo-100">
+              {location && (
+                <span className="inline-flex items-center gap-1 text-sm">
+                  <MapPin size={15} /> {location}
+                </span>
+              )}
+              {email && (
+                <a href={`mailto:${email}`} className="inline-flex items-center gap-1 text-sm hover:text-white">
+                  <Mail size={15} /> {email}
+                </a>
+              )}
             </div>
           </div>
 
-          <a 
-            href={cvUrl || '#'} 
-            target="_blank" 
+          <a
+            href={cvUrl || '#'}
+            target="_blank"
             rel="noopener noreferrer"
-            className={`flex items-center gap-2 bg-[#00D97E] hover:bg-[#00c26f] text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-lg shadow-emerald-500/20 ${!cvUrl && 'opacity-50 cursor-not-allowed pointer-events-none'}`}
+            className={`inline-flex items-center gap-2 px-5 py-3 rounded-xl font-bold transition-all ${
+              cvUrl
+                ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                : 'bg-white/20 text-white/70 pointer-events-none'
+            }`}
           >
-            <Download size={20} /> 
-            {cvUrl ? 'Download CV' : 'No CV Available'}
+            <Download size={18} /> {cvUrl ? 'Download CV' : 'CV not available'}
           </a>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto py-16 px-10 grid grid-cols-1 md:grid-cols-3 gap-12">
-        <div className="md:col-span-2 space-y-12">
-          
-          {/* 2. DYNAMIC PROJECTS SECTION */}
-          <section>
-            <h2 className="text-2xl font-bold border-b pb-4 mb-6">Featured Projects</h2>
-            <div className="grid gap-6">
-              {repos.length > 0 ? repos.map((repo: any) => (
-                <a 
-                  key={repo.id} 
-                  href={repo.html_url} 
-                  target="_blank" 
-                  className="p-6 border rounded-2xl hover:border-indigo-500 hover:shadow-md transition-all group block"
-                >
-                  <div className="flex justify-between items-center">
-                    <h3 className="font-bold text-lg text-gray-900 group-hover:text-indigo-600 transition-colors">
-                      {repo.name}
-                    </h3>
-                    <div className="flex items-center gap-3 text-gray-400">
-                      {repo.stargazers_count > 0 && (
-                        <span className="flex items-center gap-1 text-sm"><Star size={14} fill="currentColor"/> {repo.stargazers_count}</span>
+      <section className="max-w-6xl mx-auto px-6 md:px-10 py-10 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-gray-900">Projects</h2>
+              <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                {featuredProjects.length} shown
+              </span>
+            </div>
+
+            {featuredProjects.length === 0 ? (
+              <p className="text-sm text-gray-500">No projects published yet.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {featuredProjects.map((project) => (
+                  <article key={project.id} className="border border-gray-100 rounded-xl p-4">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-gray-900 truncate">{project.name}</h3>
+                      {project.is_pinned && (
+                        <span className="text-[11px] font-semibold bg-amber-100 text-amber-700 px-2 py-1 rounded-full inline-flex items-center gap-1">
+                          <Pin size={10} /> Featured
+                        </span>
                       )}
-                      <ExternalLink size={18} />
                     </div>
-                  </div>
-                  <p className="text-gray-600 mt-2 text-sm line-clamp-2">
-                    {repo.description || "A professional project showcasing advanced development skills."}
-                  </p>
-                  <div className="mt-4 flex gap-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-indigo-500 bg-indigo-50 px-2 py-1 rounded-md">
-                      {repo.language || "TypeScript"}
-                    </span>
-                  </div>
-                </a>
-              )) : (
-                <p className="text-gray-400 italic">No public projects found for this user.</p>
-              )}
-            </div>
-          </section>
+                    <p className="text-sm text-gray-600 mt-2 line-clamp-3">{project.description}</p>
 
-          <section>
-            <h2 className="text-2xl font-bold border-b pb-4 mb-6">Education & Grades</h2>
-            <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-bold text-gray-900">BSc in Computer Science</h3>
-                  <p className="text-gray-500">University of Technology</p>
-                </div>
-                <span className="bg-white px-3 py-1 rounded-full text-xs font-bold border border-gray-200">GPA: 3.9/4.0</span>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {project.tech_stack
+                        ?.split(',')
+                        .map((item) => item.trim())
+                        .filter(Boolean)
+                        .slice(0, 3)
+                        .map((item) => (
+                          <span
+                            key={`${project.id}-${item}`}
+                            className="text-xs font-semibold px-2 py-1 rounded-full bg-gray-100 text-gray-700"
+                          >
+                            {item}
+                          </span>
+                        ))}
+                    </div>
+
+                    <div className="flex items-center gap-3 mt-4">
+                      {project.live_url && (
+                        <a
+                          href={project.live_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-1"
+                        >
+                          <ExternalLink size={12} /> Live Demo
+                        </a>
+                      )}
+                      {project.github_url && (
+                        <a
+                          href={project.github_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs font-semibold text-gray-700 hover:text-gray-900 inline-flex items-center gap-1"
+                        >
+                          <Github size={12} /> Source Code
+                        </a>
+                      )}
+                    </div>
+                  </article>
+                ))}
               </div>
-            </div>
-          </section>
+            )}
+          </div>
+
+          <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Experience</h2>
+            {jobs.length === 0 ? (
+              <p className="text-sm text-gray-500">No work experience added yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {jobs.map((job) => (
+                  <article key={job.id} className="border border-gray-100 rounded-xl p-4">
+                    <p className="font-bold text-gray-900">{job.title}</p>
+                    <p className="text-sm text-gray-600">{job.company}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {formatDateLabel(job.start_date)} -{' '}
+                      {job.end_date ? formatDateLabel(job.end_date) : 'Present'}
+                    </p>
+                    {job.description && (
+                      <p className="text-sm text-gray-600 mt-2 whitespace-pre-wrap">{job.description}</p>
+                    )}
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="space-y-8">
-          <div className="bg-gray-50 p-8 rounded-[2rem] border border-gray-100">
-            <h3 className="font-bold mb-4 uppercase text-xs tracking-widest text-gray-400">Skills</h3>
-            <div className="flex flex-wrap gap-2">
-              {['React', 'Next.js', 'TypeScript', 'Tailwind', 'Python', 'Supabase'].map((skill) => (
-                <span key={skill} className="bg-white px-4 py-2 rounded-xl text-sm border border-gray-200 shadow-sm">
-                  {skill}
-                </span>
-              ))}
+        <aside className="space-y-6">
+          <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400">Quick Facts</h3>
+            <div className="mt-4 space-y-2 text-sm text-gray-700">
+              <p>
+                <span className="font-semibold text-gray-900">Projects:</span> {projects.length}
+              </p>
+              <p>
+                <span className="font-semibold text-gray-900">Roles:</span> {jobs.length}
+              </p>
+              <p>
+                <span className="font-semibold text-gray-900">Skills:</span> {skills.length}
+              </p>
             </div>
           </div>
 
-          <div className="flex flex-col gap-3">
-            <button className="w-full flex items-center justify-center gap-3 py-4 border-2 border-gray-100 rounded-2xl font-bold hover:bg-gray-50 transition-colors">
-              <Linkedin size={20} className="text-[#0077B5]" /> LinkedIn Profile
-            </button>
-            <a 
-              href={`https://github.com/${username}`} 
-              target="_blank"
-              className="w-full flex items-center justify-center gap-3 py-4 border-2 border-gray-100 rounded-2xl font-bold hover:bg-gray-50 transition-colors"
-            >
-              <Github size={20} /> GitHub Portfolio
-            </a>
+          <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400">Skills</h3>
+            {skills.length === 0 ? (
+              <p className="text-sm text-gray-500 mt-3">No skills listed yet.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {skills.map((skill) => (
+                  <span key={skill} className="bg-indigo-50 text-indigo-700 px-3 py-2 rounded-xl text-sm font-semibold">
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      </main>
-    </div>
+
+          <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm space-y-2">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400">Links</h3>
+            {linkedinUrl && (
+              <a
+                href={linkedinUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                <Linkedin size={16} /> LinkedIn
+              </a>
+            )}
+            {githubUrl && (
+              <a
+                href={githubUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                <Github size={16} /> GitHub
+              </a>
+            )}
+          </div>
+        </aside>
+      </section>
+    </main>
   );
 }

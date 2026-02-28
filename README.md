@@ -143,6 +143,26 @@ Policies are defined in:
 - `npm run build` → production build
 - `npm run start` → production server
 - `npm run lint` → ESLint
+- `npm run test:e2e` → Playwright smoke suite
+- `npm run test:e2e:ui` → Playwright UI mode
+
+## QA Portfolio Evidence
+
+If you are reviewing this project from a QA perspective, see:
+
+- [docs/qa/TEST_PLAN.md](docs/qa/TEST_PLAN.md)
+- [docs/qa/TEST_CASES.md](docs/qa/TEST_CASES.md)
+- [docs/qa/BUG_REPORTS.md](docs/qa/BUG_REPORTS.md)
+- [docs/qa/QA_EXECUTION_REPORT.md](docs/qa/QA_EXECUTION_REPORT.md)
+- [docs/qa/postman/MyDigitalDossier_QA.postman_collection.json](docs/qa/postman/MyDigitalDossier_QA.postman_collection.json)
+
+Quick verification commands:
+
+```bash
+npm run lint
+npm run build
+npm run test:e2e
+```
 
 ## Recommended Next Step
 

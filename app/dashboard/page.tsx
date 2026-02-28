@@ -15,6 +15,8 @@ import {
   Pin,
   LogOut,
   LogIn,
+  Copy,
+  Check,
 } from 'lucide-react';
 import Vault from '../../components/Vault';
 import Jobs from '../../components/Jobs';
@@ -42,6 +44,8 @@ export default function Home() {
   const [profile, setProfile] = useState<ProfileSettings | null>(null);
   const [isHomeLoading, setIsHomeLoading] = useState(true);
   const [homeError, setHomeError] = useState<string | null>(null);
+  const [isPublicLinkCopied, setIsPublicLinkCopied] = useState(false);
+  const [appOrigin, setAppOrigin] = useState('');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({
@@ -71,7 +75,13 @@ export default function Home() {
     } catch {
       return null;
     }
-  }, [profileForm.github_url]);
+  }, [profileForm.github_url, profileForm.github_username]);
+
+  const publicPortfolioUrl = useMemo(() => {
+    if (!profileUsername) return '';
+    if (!appOrigin) return `/profile/${profileUsername}`;
+    return `${appOrigin}/profile/${profileUsername}`;
+  }, [appOrigin, profileUsername]);
 
   const buildDefaultProfileForm = useCallback(
     (username: string, email: string | null, data?: ProfileSettings | null) => ({
@@ -140,6 +150,10 @@ export default function Home() {
 
     return undefined;
   }, [normalizeUsername, router]);
+
+  useEffect(() => {
+    setAppOrigin(window.location.origin);
+  }, []);
 
   useEffect(() => {
     if (!profileUsername) return;
@@ -212,6 +226,18 @@ export default function Home() {
 
     return Math.round((totalMonths / 12) * 10) / 10;
   }, [jobs]);
+
+  const handleCopyPublicPortfolioLink = async () => {
+    if (!publicPortfolioUrl) return;
+
+    try {
+      await navigator.clipboard.writeText(publicPortfolioUrl);
+      setIsPublicLinkCopied(true);
+      window.setTimeout(() => setIsPublicLinkCopied(false), 1500);
+    } catch {
+      setHomeError('Could not copy public portfolio link.');
+    }
+  };
 
   const handleProfileFieldChange = (field: keyof typeof profileForm, value: string) => {
     setProfileForm((prev) => ({
@@ -373,7 +399,7 @@ export default function Home() {
                         <Sparkles size={12} /> Portfolio Snapshot
                       </div>
                       <h2 className="text-4xl md:text-5xl font-extrabold text-gray-900 mt-4">
-                        {profileForm.full_name || 'Maria Alatsaki'}
+                        {profileForm.full_name || profileUsername}
                       </h2>
                       <p className="text-gray-700 mt-3 font-semibold">
                         {profileForm.role_title || 'Software Engineer'}
@@ -522,6 +548,41 @@ export default function Home() {
                       />
                     </div>
                   )}
+                </section>
+
+                <section className="mt-6 bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wider text-indigo-600">
+                        Public Portfolio Link
+                      </p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Share this link with HR to view your full portfolio page.
+                      </p>
+                      <p className="text-sm font-semibold text-gray-900 mt-2 break-all">
+                        {publicPortfolioUrl}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={handleCopyPublicPortfolioLink}
+                        className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                      >
+                        {isPublicLinkCopied ? <Check size={14} /> : <Copy size={14} />}
+                        {isPublicLinkCopied ? 'Copied' : 'Copy Link'}
+                      </button>
+                      <a
+                        href={publicPortfolioUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-[#1E1B33] text-white rounded-xl text-sm font-semibold hover:bg-black"
+                      >
+                        <ExternalLink size={14} /> Open Public Page
+                      </a>
+                    </div>
+                  </div>
                 </section>
 
                 {homeError && (
