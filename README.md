@@ -171,3 +171,8 @@ Move from local testing auth to secure auth:
 - hash passwords,
 - enforce strict per-user RLS,
 - and replace localStorage sessions with secure server/session auth.
+
+
+## License
+
+This project is licensed under the MIT License - see the [License](LICENSE) file for details.
