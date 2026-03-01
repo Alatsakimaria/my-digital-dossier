@@ -1,7 +1,20 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 
 export default function RootPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const existingSession = window.localStorage.getItem('dossier_local_user');
+    if (existingSession) {
+      router.replace('/dashboard');
+    }
+  }, [router]);
+
   return (
     <main className="min-h-screen bg-white relative overflow-hidden">
       <div className="absolute -top-24 -left-20 w-72 h-72 rounded-full bg-indigo-100/60 blur-3xl pointer-events-none" />
@@ -25,13 +38,13 @@ export default function RootPage() {
 
             <div className="flex flex-wrap gap-3 mt-8 animate-fade-in-delayed-2">
               <Link
-                href="/login"
+                href="/login?force=1"
                 className="inline-flex items-center justify-center px-6 py-3 bg-[#1E1B33] text-white rounded-xl font-bold hover:bg-black transition-all"
               >
                 Login
               </Link>
               <Link
-                href="/login?mode=signup"
+                href="/login?mode=signup&force=1"
                 className="inline-flex items-center justify-center px-6 py-3 border border-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-all"
               >
                 Create Account

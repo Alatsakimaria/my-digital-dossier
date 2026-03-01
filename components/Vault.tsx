@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { Upload, FileText, CheckCircle, File, Loader2, Trash2 } from 'lucide-react';
-// 1. Import the supabase client you created earlier
 import { supabase } from '../lib/supabase';
 
 type UploadedDoc = {
@@ -150,14 +149,14 @@ export default function Vault({ username }: VaultProps) {
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       <div>
-        <h3 className="text-3xl font-extrabold text-gray-900">Document Vault</h3>
+        <h3 className="text-2xl md:text-3xl font-extrabold text-gray-900">Document Vault</h3>
         <p className="text-gray-500 mt-1">Securely manage your professional and academic documents.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         
         {/* CV UPLOAD CARD */}
-        <div className={`group p-10 border-2 border-dashed rounded-[2.5rem] bg-white transition-all flex flex-col items-center text-center ${cvFiles.length > 0 ? 'border-emerald-500 bg-emerald-50/10' : 'border-gray-200 hover:border-indigo-400'}`}>
+        <div className={`group p-6 md:p-10 border-2 border-dashed rounded-[1.75rem] md:rounded-[2.5rem] bg-white transition-all flex flex-col items-center text-center ${cvFiles.length > 0 ? 'border-emerald-500 bg-emerald-50/10' : 'border-gray-200 hover:border-indigo-400'}`}>
           <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 transition-colors ${cvFiles.length > 0 ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-50 text-gray-400 group-hover:bg-indigo-50 group-hover:text-indigo-600'}`}>
             {isUploading ? <Loader2 className="animate-spin" size={32} /> : cvFiles.length > 0 ? <CheckCircle size={32} /> : <Upload size={32} />}
           </div>
@@ -173,13 +172,13 @@ export default function Vault({ username }: VaultProps) {
           </label>
         </div>
 
-        {/* GRADES UPLOAD CARD (Keeping this as is for now) */}
-        <div className="group p-10 border-2 border-dashed border-gray-200 rounded-[2.5rem] bg-white hover:border-amber-400 transition-all flex flex-col items-center text-center">
-          <div className="w-16 h-16 bg-gray-50 text-gray-400 group-hover:bg-amber-50 group-hover:text-amber-600 rounded-2xl flex items-center justify-center mb-6 transition-colors">
-            <FileText size={32} />
+        {/* GRADES UPLOAD CARD */}
+        <div className={`group p-6 md:p-10 border-2 border-dashed rounded-[1.75rem] md:rounded-[2.5rem] bg-white transition-all flex flex-col items-center text-center ${gradeFiles.length > 0 ? 'border-amber-500 bg-amber-50/10' : 'border-gray-200 hover:border-amber-400'}`}>
+          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 transition-colors ${gradeFiles.length > 0 ? 'bg-amber-100 text-amber-600' : 'bg-gray-50 text-gray-400 group-hover:bg-amber-50 group-hover:text-amber-600'}`}>
+            {isUploadingGrades ? <Loader2 className="animate-spin" size={32} /> : gradeFiles.length > 0 ? <CheckCircle size={32} /> : <FileText size={32} />}
           </div>
           
-          <h4 className="text-xl font-bold text-gray-900">Academic Records</h4>
+          <h4 className="text-xl font-bold text-gray-900">{isUploadingGrades ? 'Uploading...' : 'Academic Records'}</h4>
           <p className="text-sm text-gray-500 mt-2 max-w-[200px]">Upload certificates, transcripts, or course grades.</p>
 
           <input type="file" id="grades-input" className="hidden" multiple onChange={handleGradesChange} disabled={isUploadingGrades} />
@@ -197,9 +196,9 @@ export default function Vault({ username }: VaultProps) {
             <div className="space-y-3">
               <h4 className="text-lg font-bold text-gray-900">Uploaded CVs</h4>
               {cvFiles.map((file, i) => (
-                <div key={`${file.name}-${i}`} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex items-center justify-between">
+                <div key={`${file.name}-${i}`} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-bold text-gray-900 truncate max-w-[240px]">{file.name}</p>
+                    <p className="text-sm font-bold text-gray-900 break-all sm:truncate sm:max-w-[240px]">{file.name}</p>
                     <a
                       href={file.url}
                       target="_blank"
@@ -209,7 +208,7 @@ export default function Vault({ username }: VaultProps) {
                       Open PDF
                     </a>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 self-end sm:self-auto">
                     <CheckCircle size={16} className="text-emerald-500" />
                     <button
                       type="button"
@@ -230,9 +229,9 @@ export default function Vault({ username }: VaultProps) {
             <div className="space-y-3">
               <h4 className="text-lg font-bold text-gray-900">Uploaded Academic Records</h4>
               {gradeFiles.map((file, i) => (
-                <div key={`${file.name}-${i}`} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex items-center justify-between">
+                <div key={`${file.name}-${i}`} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-bold text-gray-900 truncate max-w-[240px]">{file.name}</p>
+                    <p className="text-sm font-bold text-gray-900 break-all sm:truncate sm:max-w-[240px]">{file.name}</p>
                     <a
                       href={file.url}
                       target="_blank"
@@ -242,7 +241,7 @@ export default function Vault({ username }: VaultProps) {
                       Open PDF
                     </a>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 self-end sm:self-auto">
                     <CheckCircle size={16} className="text-emerald-500" />
                     <button
                       type="button"
@@ -262,7 +261,7 @@ export default function Vault({ username }: VaultProps) {
       )}
 
       {/* Recruiter Visibility Tip */}
-      <div className="bg-[#1E1B33] p-6 rounded-[2rem] text-white flex items-center justify-between">
+      <div className="bg-[#1E1B33] p-5 md:p-6 rounded-[1.5rem] md:rounded-[2rem] text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
             <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
                 <File size={20} className="text-indigo-300" />
@@ -272,7 +271,7 @@ export default function Vault({ username }: VaultProps) {
                 <p className="text-xs text-gray-400">Documents are hidden from your public profile by default.</p>
             </div>
         </div>
-        <button className="text-xs font-bold bg-white text-[#1E1B33] px-4 py-2 rounded-lg hover:bg-gray-100">Settings</button>
+        <button className="text-xs font-bold bg-white text-[#1E1B33] px-4 py-2 rounded-lg hover:bg-gray-100 w-full sm:w-auto">Settings</button>
       </div>
     </div>
   );

@@ -10,6 +10,7 @@ type AuthMode = 'login' | 'signup';
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<AuthMode>('login');
+  const [isSessionChecking, setIsSessionChecking] = useState(true);
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
   const [fullName, setFullName] = useState('');
@@ -26,14 +27,31 @@ export default function LoginPage() {
       .slice(0, 24);
 
   useEffect(() => {
-    const requestedMode = new URLSearchParams(window.location.search).get('mode');
-    if (requestedMode === 'signup') {
-      setMode('signup');
+    const params = new URLSearchParams(window.location.search);
+    const forceAuth = params.get('force') === '1';
+    const existingSession = window.localStorage.getItem('dossier_local_user');
+    if (existingSession && !forceAuth) {
+      router.replace('/dashboard');
       return;
     }
 
-    setMode('login');
-  }, []);
+    const requestedMode = params.get('mode');
+    if (requestedMode === 'signup') {
+      setMode('signup');
+    } else {
+      setMode('login');
+    }
+
+    setIsSessionChecking(false);
+  }, [router]);
+
+  if (isSessionChecking) {
+    return (
+      <main className="min-h-screen bg-white flex items-center justify-center p-6">
+        <div className="text-sm font-semibold text-gray-600">Loading account...</div>
+      </main>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

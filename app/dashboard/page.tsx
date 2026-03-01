@@ -14,7 +14,6 @@ import {
   Save,
   Pin,
   LogOut,
-  LogIn,
   Copy,
   Check,
 } from 'lucide-react';
@@ -32,13 +31,18 @@ import {
   type Project,
 } from '../../lib/supabase';
 
+type DashboardTab = 'dashboard' | 'vault' | 'jobs' | 'projects';
+
+const isDashboardTab = (value: string | null): value is DashboardTab =>
+  value === 'dashboard' || value === 'vault' || value === 'jobs' || value === 'projects';
+
 export default function Home() {
   const router = useRouter();
   const [profileUsername, setProfileUsername] = useState<string | null>(null);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState<DashboardTab>('dashboard');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [profile, setProfile] = useState<ProfileSettings | null>(null);
@@ -110,6 +114,24 @@ export default function Home() {
     return cleaned || `user_${Date.now().toString().slice(-6)}`;
   }, []);
 
+  const readTabFromUrl = useCallback((): DashboardTab => {
+    const tabParam = new URLSearchParams(window.location.search).get('tab');
+    return isDashboardTab(tabParam) ? tabParam : 'dashboard';
+  }, []);
+
+  const handleTabChange = useCallback((nextTab: DashboardTab) => {
+    setActiveTab(nextTab);
+
+    const url = new URL(window.location.href);
+    if (nextTab === 'dashboard') {
+      url.searchParams.delete('tab');
+    } else {
+      url.searchParams.set('tab', nextTab);
+    }
+
+    window.history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  }, []);
+
   useEffect(() => {
     const loadAuthUser = async () => {
       setIsAuthLoading(true);
@@ -150,6 +172,17 @@ export default function Home() {
 
     return undefined;
   }, [normalizeUsername, router]);
+
+  useEffect(() => {
+    setActiveTab(readTabFromUrl());
+
+    const onPopState = () => {
+      setActiveTab(readTabFromUrl());
+    };
+
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [readTabFromUrl]);
 
   useEffect(() => {
     setAppOrigin(window.location.origin);
@@ -319,37 +352,37 @@ export default function Home() {
   }
 
   return (
-    <main className="flex h-screen w-full bg-white overflow-hidden">
+    <main className="flex min-h-screen w-full flex-col lg:h-screen lg:flex-row bg-white lg:overflow-hidden">
       
       {/* LEFT SIDEBAR */}
-      <aside className="w-64 bg-[#1E1B33] text-gray-400 flex flex-col p-4">
-        <div className="flex items-center gap-2 px-2 mb-8 text-white font-bold text-xl">Dossier</div>
+      <aside className="w-full lg:w-64 bg-[#1E1B33] text-gray-400 flex flex-col p-4 lg:p-4">
+        <div className="flex items-center gap-2 px-2 mb-4 lg:mb-8 text-white font-bold text-xl">Dossier</div>
         
-        <nav className="flex-1 space-y-2">
+        <nav className="flex-1 flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0">
           <div 
-            onClick={() => setActiveTab('dashboard')}
-            className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${activeTab === 'dashboard' ? 'bg-white/10 text-white' : 'hover:bg-white/5'}`}
+            onClick={() => handleTabChange('dashboard')}
+            className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-white/10 text-white' : 'hover:bg-white/5'}`}
           >
             <LayoutDashboard size={18} /> Home
           </div>
 
           <div 
-            onClick={() => setActiveTab('vault')}
-            className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${activeTab === 'vault' ? 'bg-white/10 text-white' : 'hover:bg-white/5'}`}
+            onClick={() => handleTabChange('vault')}
+            className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all whitespace-nowrap ${activeTab === 'vault' ? 'bg-white/10 text-white' : 'hover:bg-white/5'}`}
           >
             <FileText size={18} /> Vault
           </div>
 
           <div
-            onClick={() => setActiveTab('jobs')}
-            className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${activeTab === 'jobs' ? 'bg-white/10 text-white' : 'hover:bg-white/5'}`}
+            onClick={() => handleTabChange('jobs')}
+            className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all whitespace-nowrap ${activeTab === 'jobs' ? 'bg-white/10 text-white' : 'hover:bg-white/5'}`}
           >
             <BriefcaseBusiness size={18} /> Jobs
           </div>
 
           <div
-            onClick={() => setActiveTab('projects')}
-            className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${activeTab === 'projects' ? 'bg-white/10 text-white' : 'hover:bg-white/5'}`}
+            onClick={() => handleTabChange('projects')}
+            className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all whitespace-nowrap ${activeTab === 'projects' ? 'bg-white/10 text-white' : 'hover:bg-white/5'}`}
           >
             <Code2 size={18} /> Projects
           </div>
@@ -357,9 +390,9 @@ export default function Home() {
       </aside>
 
       {/* CENTRAL CANVAS */}
-      <section className="flex-1 flex flex-col bg-white overflow-hidden">
-        <header className="h-20 border-b border-gray-100 flex items-center justify-between px-10">
-          <p className="text-lg font-bold text-gray-800">
+      <section className="flex-1 flex flex-col bg-white min-h-0">
+        <header className="border-b border-gray-100 flex flex-wrap items-center justify-between gap-3 px-4 md:px-6 lg:px-10 py-4 lg:h-20 lg:py-0">
+          <p className="text-base md:text-lg font-bold text-gray-800">
             {activeTab === 'dashboard'
               ? 'Portfolio Home'
               : activeTab === 'jobs'
@@ -368,37 +401,27 @@ export default function Home() {
                   ? 'Projects'
                   : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
           </p>
-          {authUserId ? (
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 border border-gray-200 rounded-xl px-4 py-2 hover:bg-gray-50"
-            >
-              <LogOut size={14} /> Logout
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => router.push('/login')}
-              className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 border border-gray-200 rounded-xl px-4 py-2 hover:bg-gray-50"
-            >
-              <LogIn size={14} /> Logout
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 border border-gray-200 rounded-xl px-3 md:px-4 py-2 hover:bg-gray-50"
+          >
+            <LogOut size={14} /> Logout
+          </button>
         </header>
 
-        <div className="flex-1 p-10 overflow-y-auto bg-white">
-          <div className="max-w-4xl mx-auto">
+        <div className="flex-1 p-4 md:p-6 lg:p-10 overflow-y-auto bg-white">
+          <div className="max-w-5xl mx-auto">
             
             {activeTab === 'dashboard' && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <section className="bg-white border border-gray-100 rounded-[2rem] p-8 md:p-10 shadow-sm">
+                <section className="bg-white border border-gray-100 rounded-[1.5rem] md:rounded-[2rem] p-5 md:p-8 lg:p-10 shadow-sm">
                   <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
                     <div>
                       <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold uppercase tracking-wider">
                         <Sparkles size={12} /> Portfolio Snapshot
                       </div>
-                      <h2 className="text-4xl md:text-5xl font-extrabold text-gray-900 mt-4">
+                      <h2 className="text-3xl md:text-5xl font-extrabold text-gray-900 mt-4 break-words">
                         {profileForm.full_name || profileUsername}
                       </h2>
                       <p className="text-gray-700 mt-3 font-semibold">
@@ -475,14 +498,14 @@ export default function Home() {
                       )}
                       <button
                         type="button"
-                        onClick={() => setActiveTab('projects')}
+                        onClick={() => handleTabChange('projects')}
                         className="px-5 py-3 bg-[#1E1B33] text-white rounded-xl text-sm font-bold hover:bg-black transition-all"
                       >
                         Explore Projects
                       </button>
                       <button
                         type="button"
-                        onClick={() => setActiveTab('jobs')}
+                        onClick={() => handleTabChange('jobs')}
                         className="px-5 py-3 border border-gray-200 text-gray-700 rounded-xl text-sm font-bold hover:bg-gray-50 transition-all"
                       >
                         View Experience
@@ -613,7 +636,7 @@ export default function Home() {
                     <h3 className="text-2xl font-bold text-gray-900">Featured Projects</h3>
                     <button
                       type="button"
-                      onClick={() => setActiveTab('projects')}
+                      onClick={() => handleTabChange('projects')}
                       className="text-sm font-semibold text-indigo-600 hover:text-indigo-700"
                     >
                       See all projects
@@ -735,7 +758,7 @@ export default function Home() {
             )}
 
             {activeTab === 'vault' && <Vault username={profileUsername} />}
-            {activeTab === 'jobs' && <Jobs username={profileUsername} authUserId={authUserId} />}
+            {activeTab === 'jobs' && <Jobs username={profileUsername} />}
             {activeTab === 'projects' && (
               <Projects
                 username={profileUsername}

@@ -1,340 +1,278 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { BriefcaseBusiness, Building2, CalendarDays, Plus, Loader2, Trash2 } from 'lucide-react';
-import { createJob, deleteJob, getJobs, type Job } from '@/lib/supabase';
+import { useEffect, useState } from 'react';
+import { Upload, FileText, CheckCircle, File, Loader2, Trash2 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
-type JobsProps = {
-  username: string;
-  authUserId?: string | null;
+type UploadedDoc = {
+  name: string;
+  url: string;
+  path: string;
 };
 
-export default function Jobs({ username, authUserId }: JobsProps) {
-  const monthOptions = [
-    { value: '01', label: 'Jan' },
-    { value: '02', label: 'Feb' },
-    { value: '03', label: 'Mar' },
-    { value: '04', label: 'Apr' },
-    { value: '05', label: 'May' },
-    { value: '06', label: 'Jun' },
-    { value: '07', label: 'Jul' },
-    { value: '08', label: 'Aug' },
-    { value: '09', label: 'Sep' },
-    { value: '10', label: 'Oct' },
-    { value: '11', label: 'Nov' },
-    { value: '12', label: 'Dec' },
-  ];
+type VaultProps = {
+  username: string;
+};
 
-  const currentYear = new Date().getFullYear();
-  const yearOptions = Array.from({ length: 40 }, (_, idx) => String(currentYear - idx));
-
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const [title, setTitle] = useState('');
-  const [company, setCompany] = useState('');
-  const [startMonth, setStartMonth] = useState('');
-  const [startYear, setStartYear] = useState('');
-  const [endMonth, setEndMonth] = useState('');
-  const [endYear, setEndYear] = useState('');
-  const [description, setDescription] = useState('');
-
-  const buildDate = (year: string, month: string) => `${year}-${month}-01`;
-
-  const formatMonthYear = (dateValue: string | null) => {
-    if (!dateValue) return 'Present';
-
-    const parsed = new Date(dateValue);
-    if (Number.isNaN(parsed.getTime())) return dateValue;
-
-    return parsed.toLocaleDateString('en-GB', {
-      month: 'short',
-      year: 'numeric',
-    });
-  };
-
-  const loadJobs = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const data = await getJobs(username, authUserId);
-      setJobs(data);
-      setIsFormOpen(data.length === 0);
-    } catch {
-      setError('Could not load jobs right now.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [authUserId, username]);
+export default function Vault({ username }: VaultProps) {
+  const [cvFiles, setCvFiles] = useState<UploadedDoc[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isUploadingGrades, setIsUploadingGrades] = useState(false);
+  const [gradeFiles, setGradeFiles] = useState<UploadedDoc[]>([]);
 
   useEffect(() => {
-    loadJobs();
-  }, [loadJobs]);
+    const loadFiles = async () => {
+      try {
+        const [{ data: cvData }, { data: gradeData }] = await Promise.all([
+          supabase.storage.from('dossier-files').list(`cvs/${username}`, { limit: 50, sortBy: { column: 'created_at', order: 'desc' } }),
+          supabase.storage.from('dossier-files').list(`grades/${username}`, { limit: 50, sortBy: { column: 'created_at', order: 'desc' } }),
+        ]);
 
-  const clearForm = () => {
-    setTitle('');
-    setCompany('');
-    setStartMonth('');
-    setStartYear('');
-    setEndMonth('');
-    setEndYear('');
-    setDescription('');
-  };
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    if (!title || !company || !startMonth || !startYear) {
-      setError('Title, company and start date are required.');
-      return;
-    }
-
-    if ((endMonth && !endYear) || (!endMonth && endYear)) {
-      setError('Please select both end month and end year, or leave both empty.');
-      return;
-    }
-
-    setIsSaving(true);
-    setError(null);
-
-    try {
-      await createJob({
-        auth_user_id: authUserId ?? null,
-        username,
-        title,
-        company,
-        start_date: buildDate(startYear, startMonth),
-        end_date: endMonth && endYear ? buildDate(endYear, endMonth) : null,
-        description: description || null,
-      });
-
-      await loadJobs();
-      clearForm();
-      setIsFormOpen(false);
-    } catch (err: unknown) {
-      const message =
-        typeof err === 'object' && err !== null && 'message' in err
-          ? String((err as { message: unknown }).message)
-          : 'Could not save this job. Please try again.';
-      setError(message);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleDelete = async (jobId: string) => {
-    setDeletingId(jobId);
-    setError(null);
-
-    try {
-      await deleteJob(jobId);
-      setJobs((prev) => {
-        const next = prev.filter((job) => job.id !== jobId);
-        if (next.length === 0) {
-          setIsFormOpen(true);
+        if (cvData) {
+          const mapped = cvData.map((file) => {
+            const path = `cvs/${username}/${file.name}`;
+            const { data: urlData } = supabase.storage
+              .from('dossier-files')
+              .getPublicUrl(path);
+            return { name: file.name, url: urlData.publicUrl, path };
+          });
+          setCvFiles(mapped);
         }
-        return next;
-      });
+
+        if (gradeData) {
+          const mapped = gradeData.map((file) => {
+            const path = `grades/${username}/${file.name}`;
+            const { data: urlData } = supabase.storage
+              .from('dossier-files')
+              .getPublicUrl(path);
+            return { name: file.name, url: urlData.publicUrl, path };
+          });
+          setGradeFiles(mapped);
+        }
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        console.error('Failed to load stored files:', message);
+      }
+    };
+
+    loadFiles();
+  }, [username]);
+
+  // 2. Updated function to handle REAL cloud upload
+  const handleCvChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    
+    try {
+      const filePath = `cvs/${username}/${Date.now()}_${file.name}`;
+      const { data, error } = await supabase.storage
+        .from('dossier-files')
+        .upload(filePath, file);
+
+      if (error) {
+        if (error.message.includes('already exists')) {
+          const { data: urlData } = supabase.storage
+            .from('dossier-files')
+            .getPublicUrl(filePath);
+          setCvFiles((prev) => [{ name: file.name, url: urlData.publicUrl, path: filePath }, ...prev]);
+          return;
+        }
+        throw error; // This will be caught by the catch block below
+      }
+      if (data) {
+        const { data: urlData } = supabase.storage
+          .from('dossier-files')
+          .getPublicUrl(filePath);
+        setCvFiles((prev) => [{ name: file.name, url: urlData.publicUrl, path: filePath }, ...prev]);
+      }
     } catch (err: unknown) {
-      const message =
-        typeof err === 'object' && err !== null && 'message' in err
-          ? String((err as { message: unknown }).message)
-          : 'Could not delete this job. Please try again.';
-      setError(message);
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error('Silent Check:', message);
     } finally {
-      setDeletingId(null);
+        setIsUploading(false);
+    }   
+  };
+
+  const handleGradesChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+
+    setIsUploadingGrades(true);
+
+    try {
+      const uploads = Array.from(e.target.files).map(async (file) => {
+        const filePath = `grades/${username}/${Date.now()}_${file.name}`;
+        const { error } = await supabase.storage
+          .from('dossier-files')
+          .upload(filePath, file);
+
+        if (error) throw error;
+
+        const { data: urlData } = supabase.storage
+          .from('dossier-files')
+          .getPublicUrl(filePath);
+
+        return { name: file.name, url: urlData.publicUrl, path: filePath };
+      });
+
+      const uploaded = await Promise.all(uploads);
+      setGradeFiles((prev) => [...uploaded, ...prev]);
+      e.target.value = '';
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error('Grades upload failed:', message);
+    } finally {
+      setIsUploadingGrades(false);
+    }
+  };
+
+  const handleDeleteFile = async (file: UploadedDoc, kind: 'cv' | 'grade') => {
+    try {
+      const { error } = await supabase.storage
+        .from('dossier-files')
+        .remove([file.path]);
+
+      if (error) throw error;
+
+      if (kind === 'cv') {
+        setCvFiles((prev) => prev.filter((item) => item.path !== file.path));
+      } else {
+        setGradeFiles((prev) => prev.filter((item) => item.path !== file.path));
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error('Delete file failed:', message);
     }
   };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       <div>
-        <h3 className="text-3xl font-extrabold text-gray-900">Work Experience</h3>
-        <p className="text-gray-500 mt-1">Add the jobs you have done to build your professional timeline.</p>
+        <h3 className="text-3xl font-extrabold text-gray-900">Document Vault</h3>
+        <p className="text-gray-500 mt-1">Securely manage your professional and academic documents.</p>
       </div>
 
-      {!isFormOpen && (
-        <button
-          onClick={() => setIsFormOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50"
-        >
-          <Plus size={14} /> New Job
-        </button>
-      )}
-
-      {isFormOpen && (
-        <form onSubmit={handleSubmit} className="bg-white border border-gray-100 rounded-[2rem] p-6 md:p-8 shadow-sm space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Job title</label>
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Software Engineer"
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Company</label>
-              <input
-                value={company}
-                onChange={(e) => setCompany(e.target.value)}
-                placeholder="Acme Labs"
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Start date</label>
-              <div className="grid grid-cols-2 gap-2">
-                <select
-                  value={startMonth}
-                  onChange={(e) => setStartMonth(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                >
-                  <option value="">Month</option>
-                  {monthOptions.map((month) => (
-                    <option key={month.value} value={month.value}>
-                      {month.label}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={startYear}
-                  onChange={(e) => setStartYear(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                >
-                  <option value="">Year</option>
-                  {yearOptions.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">End date (optional)</label>
-              <div className="grid grid-cols-2 gap-2">
-                <select
-                  value={endMonth}
-                  onChange={(e) => setEndMonth(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                >
-                  <option value="">Month</option>
-                  {monthOptions.map((month) => (
-                    <option key={month.value} value={month.value}>
-                      {month.label}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={endYear}
-                  onChange={(e) => setEndYear(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                >
-                  <option value="">Year</option>
-                  {yearOptions.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        
+        {/* CV UPLOAD CARD */}
+        <div className={`group p-10 border-2 border-dashed rounded-[2.5rem] bg-white transition-all flex flex-col items-center text-center ${cvFiles.length > 0 ? 'border-emerald-500 bg-emerald-50/10' : 'border-gray-200 hover:border-indigo-400'}`}>
+          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 transition-colors ${cvFiles.length > 0 ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-50 text-gray-400 group-hover:bg-indigo-50 group-hover:text-indigo-600'}`}>
+            {isUploading ? <Loader2 className="animate-spin" size={32} /> : cvFiles.length > 0 ? <CheckCircle size={32} /> : <Upload size={32} />}
           </div>
+          
+          <h4 className="text-xl font-bold text-gray-900">{isUploading ? "Uploading..." : "Upload CV"}</h4>
+          <p className="text-sm text-gray-500 mt-2 max-w-[200px]">
+            Select your latest resume in PDF format.
+          </p>
 
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Description (optional)</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={4}
-              placeholder="What did you build or lead in this role?"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-            />
-          </div>
-
-          {error && <p className="text-sm font-medium text-red-600">{error}</p>}
-
-          <div className="flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-[#1E1B33] text-white rounded-xl font-bold hover:bg-black transition-all disabled:opacity-50"
-            >
-              {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-              {isSaving ? 'Saving...' : 'Add Job'}
-            </button>
-
-            {jobs.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setIsFormOpen(false)}
-                className="px-4 py-3 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            )}
-          </div>
-        </form>
-      )}
-
-      <section className="space-y-4">
-        <div className="flex items-center gap-2">
-          <BriefcaseBusiness size={18} className="text-gray-500" />
-          <h4 className="text-lg font-bold text-gray-900">Saved Jobs</h4>
+          <input type="file" id="cv-input" className="hidden" accept=".pdf" onChange={handleCvChange} disabled={isUploading} />
+          <label htmlFor="cv-input" className={`mt-6 px-4 py-2 bg-gray-900 text-white rounded-lg text-xs font-bold transition-all shadow-sm ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-black'}`}>
+            {isUploading ? "Uploading..." : "Upload CV"}
+          </label>
         </div>
 
-        {isLoading ? (
-          <div className="bg-white border border-gray-100 rounded-2xl p-6 text-gray-500 text-sm">Loading jobs...</div>
-        ) : jobs.length === 0 ? (
-          <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-8 text-center text-gray-500 text-sm">
-            No jobs added yet.
+        {/* GRADES UPLOAD CARD */}
+        <div className={`group p-10 border-2 border-dashed rounded-[2.5rem] bg-white transition-all flex flex-col items-center text-center ${gradeFiles.length > 0 ? 'border-amber-500 bg-amber-50/10' : 'border-gray-200 hover:border-amber-400'}`}>
+          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 transition-colors ${gradeFiles.length > 0 ? 'bg-amber-100 text-amber-600' : 'bg-gray-50 text-gray-400 group-hover:bg-amber-50 group-hover:text-amber-600'}`}>
+            {isUploadingGrades ? <Loader2 className="animate-spin" size={32} /> : gradeFiles.length > 0 ? <CheckCircle size={32} /> : <FileText size={32} />}
           </div>
-        ) : (
-          <div className="space-y-4">
-            {jobs.map((job) => (
-              <article key={job.id} className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
-                <div className="flex flex-wrap justify-between gap-3">
+          
+          <h4 className="text-xl font-bold text-gray-900">{isUploadingGrades ? 'Uploading...' : 'Academic Records'}</h4>
+          <p className="text-sm text-gray-500 mt-2 max-w-[200px]">Upload certificates, transcripts, or course grades.</p>
+
+          <input type="file" id="grades-input" className="hidden" multiple onChange={handleGradesChange} disabled={isUploadingGrades} />
+          <label htmlFor="grades-input" className={`mt-6 px-4 py-2 bg-gray-900 text-white rounded-lg text-xs font-bold transition-all ${isUploadingGrades ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-black'}`}>
+            {isUploadingGrades ? 'Uploading...' : 'Upload Academic Records'}
+          </label>
+
+        </div>
+
+      </div>
+
+      {(cvFiles.length > 0 || gradeFiles.length > 0) && (
+        <div className="space-y-6">
+          {cvFiles.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="text-lg font-bold text-gray-900">Uploaded CVs</h4>
+              {cvFiles.map((file, i) => (
+                <div key={`${file.name}-${i}`} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex items-center justify-between">
                   <div>
-                    <h5 className="font-bold text-gray-900 text-lg">{job.title}</h5>
-                    <p className="text-sm text-gray-600 mt-1 flex items-center gap-1">
-                      <Building2 size={14} /> {job.company}
-                    </p>
+                    <p className="text-sm font-bold text-gray-900 truncate max-w-[240px]">{file.name}</p>
+                    <a
+                      href={file.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 inline-flex text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                    >
+                      Open PDF
+                    </a>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-xs font-semibold text-gray-500 flex items-center gap-1 bg-gray-50 border border-gray-100 rounded-full px-3 py-1 h-fit">
-                      <CalendarDays size={12} />
-                      {formatMonthYear(job.start_date)} - {formatMonthYear(job.end_date)}
-                    </p>
+                  <div className="flex items-center gap-3">
+                    <CheckCircle size={16} className="text-emerald-500" />
                     <button
                       type="button"
-                      onClick={() => handleDelete(job.id)}
-                      disabled={deletingId === job.id}
-                      className="text-xs font-semibold text-red-500 border border-red-100 rounded-full px-3 py-1 hover:bg-red-50 disabled:opacity-50"
+                      onClick={() => handleDeleteFile(file, 'cv')}
+                      className="text-xs font-semibold text-red-500 border border-red-100 rounded-full px-3 py-1 hover:bg-red-50"
                     >
-                      {deletingId === job.id ? 'Deleting...' : (
-                        <span className="inline-flex items-center gap-1">
-                          <Trash2 size={12} /> Delete
-                        </span>
-                      )}
+                      <span className="inline-flex items-center gap-1">
+                        <Trash2 size={12} /> Delete
+                      </span>
                     </button>
                   </div>
                 </div>
-                {job.description && <p className="text-sm text-gray-600 mt-4">{job.description}</p>}
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
+              ))}
+            </div>
+          )}
+
+          {gradeFiles.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="text-lg font-bold text-gray-900">Uploaded Academic Records</h4>
+              {gradeFiles.map((file, i) => (
+                <div key={`${file.name}-${i}`} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-gray-900 truncate max-w-[240px]">{file.name}</p>
+                    <a
+                      href={file.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 inline-flex text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                    >
+                      Open PDF
+                    </a>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <CheckCircle size={16} className="text-emerald-500" />
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteFile(file, 'grade')}
+                      className="text-xs font-semibold text-red-500 border border-red-100 rounded-full px-3 py-1 hover:bg-red-50"
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        <Trash2 size={12} /> Delete
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Recruiter Visibility Tip */}
+      <div className="bg-[#1E1B33] p-6 rounded-[2rem] text-white flex items-center justify-between">
+        <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
+                <File size={20} className="text-indigo-300" />
+            </div>
+            <div>
+                <p className="font-bold">Recruiter Visibility</p>
+                <p className="text-xs text-gray-400">Documents are hidden from your public profile by default.</p>
+            </div>
+        </div>
+        <button className="text-xs font-bold bg-white text-[#1E1B33] px-4 py-2 rounded-lg hover:bg-gray-100">Settings</button>
+      </div>
     </div>
   );
 }
