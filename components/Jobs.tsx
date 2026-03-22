@@ -1,278 +1,214 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Upload, FileText, CheckCircle, File, Loader2, Trash2 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { BriefcaseBusiness, Loader2, Plus, Trash2 } from 'lucide-react';
+import { createJob, deleteJob, getJobs, type Job } from '../lib/supabase';
 
-type UploadedDoc = {
-  name: string;
-  url: string;
-  path: string;
-};
-
-type VaultProps = {
+type JobsProps = {
   username: string;
 };
 
-export default function Vault({ username }: VaultProps) {
-  const [cvFiles, setCvFiles] = useState<UploadedDoc[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isUploadingGrades, setIsUploadingGrades] = useState(false);
-  const [gradeFiles, setGradeFiles] = useState<UploadedDoc[]>([]);
+export default function Jobs({ username }: JobsProps) {
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    title: '',
+    company: '',
+    start_date: '',
+    end_date: '',
+    description: '',
+  });
 
   useEffect(() => {
-    const loadFiles = async () => {
+    const loadJobs = async () => {
+      setIsLoading(true);
+      setError(null);
+
       try {
-        const [{ data: cvData }, { data: gradeData }] = await Promise.all([
-          supabase.storage.from('dossier-files').list(`cvs/${username}`, { limit: 50, sortBy: { column: 'created_at', order: 'desc' } }),
-          supabase.storage.from('dossier-files').list(`grades/${username}`, { limit: 50, sortBy: { column: 'created_at', order: 'desc' } }),
-        ]);
-
-        if (cvData) {
-          const mapped = cvData.map((file) => {
-            const path = `cvs/${username}/${file.name}`;
-            const { data: urlData } = supabase.storage
-              .from('dossier-files')
-              .getPublicUrl(path);
-            return { name: file.name, url: urlData.publicUrl, path };
-          });
-          setCvFiles(mapped);
-        }
-
-        if (gradeData) {
-          const mapped = gradeData.map((file) => {
-            const path = `grades/${username}/${file.name}`;
-            const { data: urlData } = supabase.storage
-              .from('dossier-files')
-              .getPublicUrl(path);
-            return { name: file.name, url: urlData.publicUrl, path };
-          });
-          setGradeFiles(mapped);
-        }
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Unknown error';
-        console.error('Failed to load stored files:', message);
+        const data = await getJobs(username);
+        setJobs(data);
+      } catch {
+        setError('Could not load work experience right now.');
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    loadFiles();
+    loadJobs();
   }, [username]);
 
-  // 2. Updated function to handle REAL cloud upload
-  const handleCvChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploading(true);
-    
+  const formatDateLabel = (value: string) => {
     try {
-      const filePath = `cvs/${username}/${Date.now()}_${file.name}`;
-      const { data, error } = await supabase.storage
-        .from('dossier-files')
-        .upload(filePath, file);
-
-      if (error) {
-        if (error.message.includes('already exists')) {
-          const { data: urlData } = supabase.storage
-            .from('dossier-files')
-            .getPublicUrl(filePath);
-          setCvFiles((prev) => [{ name: file.name, url: urlData.publicUrl, path: filePath }, ...prev]);
-          return;
-        }
-        throw error; // This will be caught by the catch block below
-      }
-      if (data) {
-        const { data: urlData } = supabase.storage
-          .from('dossier-files')
-          .getPublicUrl(filePath);
-        setCvFiles((prev) => [{ name: file.name, url: urlData.publicUrl, path: filePath }, ...prev]);
-      }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      console.error('Silent Check:', message);
-    } finally {
-        setIsUploading(false);
-    }   
-  };
-
-  const handleGradesChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-
-    setIsUploadingGrades(true);
-
-    try {
-      const uploads = Array.from(e.target.files).map(async (file) => {
-        const filePath = `grades/${username}/${Date.now()}_${file.name}`;
-        const { error } = await supabase.storage
-          .from('dossier-files')
-          .upload(filePath, file);
-
-        if (error) throw error;
-
-        const { data: urlData } = supabase.storage
-          .from('dossier-files')
-          .getPublicUrl(filePath);
-
-        return { name: file.name, url: urlData.publicUrl, path: filePath };
+      return new Date(value).toLocaleDateString('en-GB', {
+        month: 'short',
+        year: 'numeric',
       });
-
-      const uploaded = await Promise.all(uploads);
-      setGradeFiles((prev) => [...uploaded, ...prev]);
-      e.target.value = '';
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      console.error('Grades upload failed:', message);
-    } finally {
-      setIsUploadingGrades(false);
+    } catch {
+      return value;
     }
   };
 
-  const handleDeleteFile = async (file: UploadedDoc, kind: 'cv' | 'grade') => {
+  const handleFormChange = (field: keyof typeof form, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleAddJob = async () => {
+    if (!form.title.trim() || !form.company.trim() || !form.start_date) {
+      setError('Title, company and start date are required.');
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
     try {
-      const { error } = await supabase.storage
-        .from('dossier-files')
-        .remove([file.path]);
+      const newJob = await createJob({
+        username,
+        title: form.title.trim(),
+        company: form.company.trim(),
+        start_date: form.start_date,
+        end_date: form.end_date || null,
+        description: form.description.trim() || null,
+      });
 
-      if (error) throw error;
+      setJobs((prev) => [newJob, ...prev]);
+      setForm({
+        title: '',
+        company: '',
+        start_date: '',
+        end_date: '',
+        description: '',
+      });
+    } catch {
+      setError('Could not add this role right now.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-      if (kind === 'cv') {
-        setCvFiles((prev) => prev.filter((item) => item.path !== file.path));
-      } else {
-        setGradeFiles((prev) => prev.filter((item) => item.path !== file.path));
-      }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      console.error('Delete file failed:', message);
+  const handleDeleteJob = async (jobId: string) => {
+    setDeletingJobId(jobId);
+    setError(null);
+
+    try {
+      await deleteJob(jobId);
+      setJobs((prev) => prev.filter((job) => job.id !== jobId));
+    } catch {
+      setError('Could not delete this role right now.');
+    } finally {
+      setDeletingJobId(null);
     }
   };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       <div>
-        <h3 className="text-3xl font-extrabold text-gray-900">Document Vault</h3>
-        <p className="text-gray-500 mt-1">Securely manage your professional and academic documents.</p>
+        <h3 className="text-3xl font-extrabold text-gray-900">Work Experience</h3>
+        <p className="text-gray-500 mt-1">Add your roles so they show up on your public profile.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        
-        {/* CV UPLOAD CARD */}
-        <div className={`group p-10 border-2 border-dashed rounded-[2.5rem] bg-white transition-all flex flex-col items-center text-center ${cvFiles.length > 0 ? 'border-emerald-500 bg-emerald-50/10' : 'border-gray-200 hover:border-indigo-400'}`}>
-          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 transition-colors ${cvFiles.length > 0 ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-50 text-gray-400 group-hover:bg-indigo-50 group-hover:text-indigo-600'}`}>
-            {isUploading ? <Loader2 className="animate-spin" size={32} /> : cvFiles.length > 0 ? <CheckCircle size={32} /> : <Upload size={32} />}
+      <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <input
+            value={form.title}
+            onChange={(event) => handleFormChange('title', event.target.value)}
+            placeholder="Role title"
+            className="border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+          />
+          <input
+            value={form.company}
+            onChange={(event) => handleFormChange('company', event.target.value)}
+            placeholder="Company"
+            className="border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+          />
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-1">Start date</p>
+            <input
+              type="date"
+              value={form.start_date}
+              onChange={(event) => handleFormChange('start_date', event.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            />
           </div>
-          
-          <h4 className="text-xl font-bold text-gray-900">{isUploading ? "Uploading..." : "Upload CV"}</h4>
-          <p className="text-sm text-gray-500 mt-2 max-w-[200px]">
-            Select your latest resume in PDF format.
-          </p>
-
-          <input type="file" id="cv-input" className="hidden" accept=".pdf" onChange={handleCvChange} disabled={isUploading} />
-          <label htmlFor="cv-input" className={`mt-6 px-4 py-2 bg-gray-900 text-white rounded-lg text-xs font-bold transition-all shadow-sm ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-black'}`}>
-            {isUploading ? "Uploading..." : "Upload CV"}
-          </label>
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-1">End date (optional)</p>
+            <input
+              type="date"
+              value={form.end_date}
+              onChange={(event) => handleFormChange('end_date', event.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            />
+          </div>
         </div>
 
-        {/* GRADES UPLOAD CARD */}
-        <div className={`group p-10 border-2 border-dashed rounded-[2.5rem] bg-white transition-all flex flex-col items-center text-center ${gradeFiles.length > 0 ? 'border-amber-500 bg-amber-50/10' : 'border-gray-200 hover:border-amber-400'}`}>
-          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 transition-colors ${gradeFiles.length > 0 ? 'bg-amber-100 text-amber-600' : 'bg-gray-50 text-gray-400 group-hover:bg-amber-50 group-hover:text-amber-600'}`}>
-            {isUploadingGrades ? <Loader2 className="animate-spin" size={32} /> : gradeFiles.length > 0 ? <CheckCircle size={32} /> : <FileText size={32} />}
-          </div>
-          
-          <h4 className="text-xl font-bold text-gray-900">{isUploadingGrades ? 'Uploading...' : 'Academic Records'}</h4>
-          <p className="text-sm text-gray-500 mt-2 max-w-[200px]">Upload certificates, transcripts, or course grades.</p>
+        <textarea
+          value={form.description}
+          onChange={(event) => handleFormChange('description', event.target.value)}
+          placeholder="Short description of your responsibilities and impact"
+          rows={4}
+          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+        />
 
-          <input type="file" id="grades-input" className="hidden" multiple onChange={handleGradesChange} disabled={isUploadingGrades} />
-          <label htmlFor="grades-input" className={`mt-6 px-4 py-2 bg-gray-900 text-white rounded-lg text-xs font-bold transition-all ${isUploadingGrades ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-black'}`}>
-            {isUploadingGrades ? 'Uploading...' : 'Upload Academic Records'}
-          </label>
-
-        </div>
-
+        <button
+          type="button"
+          onClick={handleAddJob}
+          disabled={isSaving}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[#1E1B33] text-white rounded-xl text-sm font-semibold hover:bg-black disabled:opacity-50"
+        >
+          {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+          {isSaving ? 'Adding...' : 'Add Role'}
+        </button>
       </div>
 
-      {(cvFiles.length > 0 || gradeFiles.length > 0) && (
+      {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+
+      {isLoading ? (
+        <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm text-sm text-gray-500">
+          Loading work experience...
+        </div>
+      ) : jobs.length === 0 ? (
+        <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-8 text-center text-sm text-gray-500">
+          No roles yet. Add your first work experience entry.
+        </div>
+      ) : (
         <div className="space-y-6">
-          {cvFiles.length > 0 && (
-            <div className="space-y-3">
-              <h4 className="text-lg font-bold text-gray-900">Uploaded CVs</h4>
-              {cvFiles.map((file, i) => (
-                <div key={`${file.name}-${i}`} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-bold text-gray-900 truncate max-w-[240px]">{file.name}</p>
-                    <a
-                      href={file.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-2 inline-flex text-xs font-semibold text-indigo-600 hover:text-indigo-700"
-                    >
-                      Open PDF
-                    </a>
+          {jobs.map((job) => (
+            <article key={job.id} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-indigo-600 mb-2">
+                    <BriefcaseBusiness size={12} /> Experience
                   </div>
-                  <div className="flex items-center gap-3">
-                    <CheckCircle size={16} className="text-emerald-500" />
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteFile(file, 'cv')}
-                      className="text-xs font-semibold text-red-500 border border-red-100 rounded-full px-3 py-1 hover:bg-red-50"
-                    >
-                      <span className="inline-flex items-center gap-1">
-                        <Trash2 size={12} /> Delete
-                      </span>
-                    </button>
-                  </div>
+                  <p className="text-lg font-bold text-gray-900">{job.title}</p>
+                  <p className="text-sm text-gray-700">{job.company}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {formatDateLabel(job.start_date)} - {job.end_date ? formatDateLabel(job.end_date) : 'Present'}
+                  </p>
                 </div>
-              ))}
-            </div>
-          )}
-
-          {gradeFiles.length > 0 && (
-            <div className="space-y-3">
-              <h4 className="text-lg font-bold text-gray-900">Uploaded Academic Records</h4>
-              {gradeFiles.map((file, i) => (
-                <div key={`${file.name}-${i}`} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-bold text-gray-900 truncate max-w-[240px]">{file.name}</p>
-                    <a
-                      href={file.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-2 inline-flex text-xs font-semibold text-indigo-600 hover:text-indigo-700"
-                    >
-                      Open PDF
-                    </a>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <CheckCircle size={16} className="text-emerald-500" />
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteFile(file, 'grade')}
-                      className="text-xs font-semibold text-red-500 border border-red-100 rounded-full px-3 py-1 hover:bg-red-50"
-                    >
-                      <span className="inline-flex items-center gap-1">
-                        <Trash2 size={12} /> Delete
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                <button
+                  type="button"
+                  onClick={() => handleDeleteJob(job.id)}
+                  disabled={deletingJobId === job.id}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-red-500 border border-red-100 rounded-full px-3 py-1 hover:bg-red-50 disabled:opacity-50"
+                >
+                  {deletingJobId === job.id ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <Trash2 size={12} />
+                  )}
+                  Delete
+                </button>
+              </div>
+              {job.description && (
+                <p className="text-sm text-gray-600 mt-3 whitespace-pre-wrap">{job.description}</p>
+              )}
+            </article>
+          ))}
         </div>
       )}
-
-      {/* Recruiter Visibility Tip */}
-      <div className="bg-[#1E1B33] p-6 rounded-[2rem] text-white flex items-center justify-between">
-        <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
-                <File size={20} className="text-indigo-300" />
-            </div>
-            <div>
-                <p className="font-bold">Recruiter Visibility</p>
-                <p className="text-xs text-gray-400">Documents are hidden from your public profile by default.</p>
-            </div>
-        </div>
-        <button className="text-xs font-bold bg-white text-[#1E1B33] px-4 py-2 rounded-lg hover:bg-gray-100">Settings</button>
-      </div>
     </div>
   );
 }
